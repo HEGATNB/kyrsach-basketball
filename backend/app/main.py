@@ -1,8 +1,7 @@
-﻿import models, database
+﻿from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-models.Base.metadata.create_all(bind=database.engine)
-
-app = FastAPI(title="HoopStat API")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,18 +13,23 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "HoopStat API is running 🏀"}
+    return {"status": "Backend is running 🚀"}
+
+# Временные роуты без БД
+teams = [
+    {"id": 1, "name": "Лейкерс", "city": "Лос-Анджелес"},
+    {"id": 2, "name": "Уорриорз", "city": "Сан-Франциско"}
+]
 
 @app.get("/teams/")
-def get_teams(db: Session = Depends(database.get_db)):
-    return db.query(models.Team).all()
+def get_teams():
+    return teams
 
-@app.post("/predict/")
-def predict_match(home_team_id: int, guest_team_id: int):
+@app.get("/predict/")
+def predict_match(home_team_id: int = 1, guest_team_id: int = 2):
+    import random
     home_prob = random.randint(30, 90)
-    guest_prob = 100 - home_prob
     return {
         "home_team_win_probability": home_prob,
-        "guest_team_win_probability": guest_prob,
-        "ai_message": "Анализ завершен. Преимущество в подборах у хозяев."
+        "guest_team_win_probability": 100 - home_prob
     }
