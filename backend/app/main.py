@@ -1,8 +1,4 @@
-﻿from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from . import models, database
-import random
+﻿import models, database
 
 models.Base.metadata.create_all(bind=database.engine)
 
