@@ -1,0 +1,455 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== КОНФЕРЕНЦИИ И ДИВИЗИОНЫ ==========
+model Conference {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // "Eastern", "Western"
+  shortName String   // "East", "West"
+  divisions Division[]
+  teams     Team[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Division {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique // "Atlantic", "Central", "Southeast", "Northwest", "Pacific", "Southwest"
+  conferenceId Int
+  conference   Conference @relation(fields: [conferenceId], references: [id])
+  teams        Team[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ========== РОЛИ И ПРАВА ==========
+model Role {
+  id          Int           @id @default(autoincrement())
+  name        String        @unique // admin, operator, user
+  description String?
+  users       User[]
+  permissions Permission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Permission {
+  id          Int    @id @default(autoincrement())
+  name        String @unique // create:team, read:match, delete:user etc
+  description String?
+  roles       Role[]
+
+  createdAt DateTime @default(now())
+}
+
+// ========== ПОЛЬЗОВАТЕЛИ ==========
+model User {
+  id             Int         @id @default(autoincrement())
+  email          String      @unique
+  passwordHash   String
+  name           String
+  roleId         Int
+  role           Role        @relation(fields: [roleId], references: [id])
+  isBlocked      Boolean     @default(false)
+  lastLoginAt    DateTime?
+  
+  predictions    Prediction[]
+  auditLogs      AuditLog[]
+  createdMatches Match[]      @relation("MatchCreator")
+  backups        Backup[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ========== КОМАНДЫ ==========
+model Team {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  abbrev         String?  // Аббревиатура (BOS, LAL, etc)
+  fullName       String?
+  nickname       String?
+  city           String?
+  arena          String?
+  foundedYear    Int?
+  championships  Int      @default(0)
+  
+  // Связи
+  conferenceId   Int
+  conference     Conference @relation(fields: [conferenceId], references: [id])
+  divisionId     Int
+  division       Division   @relation(fields: [divisionId], references: [id])
+  
+  // Статистика
+  wins           Int     @default(0)
+  losses         Int     @default(0)
+  pointsFor      Float   @default(0)
+  pointsAgainst  Float   @default(0)
+  
+  // Сезонная статистика
+  seasonWins     Int     @default(0)
+  seasonLosses   Int     @default(0)
+  pointsPerGame  Float   @default(0)
+  
+  // Матчи
+  homeMatches    Match[] @relation("HomeTeam")
+  awayMatches    Match[] @relation("AwayTeam")
+  
+  // Игроки
+  players        Player[]
+  
+  // Статистика команд
+  teamStats      TeamStats[]
+  
+  // Прогнозы
+  predictionsAsTeam1 Prediction[] @relation("Team1")
+  predictionsAsTeam2 Prediction[] @relation("Team2")
+  
+  // Данные для AI
+  aiDataAsTeam1  AITrainingData[] @relation("AITeam1")
+  aiDataAsTeam2  AITrainingData[] @relation("AITeam2")
+  
+  // Исторические данные
+  historicalAsTeam1 HistoricalData[] @relation("HistTeam1")
+  historicalAsTeam2 HistoricalData[] @relation("HistTeam2")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ========== ИГРОКИ ==========
+model Player {
+  id         Int      @id @default(autoincrement())
+  firstName  String
+  lastName   String
+  fullName   String   @unique
+  birthDate  DateTime?
+  country    String?
+  height     Int?     // в см
+  weight     Int?     // в кг
+  position   String   // PG, SG, SF, PF, C
+  jerseyNumber Int?
+  
+  teamId     Int
+  team       Team     @relation(fields: [teamId], references: [id])
+  
+  // Статистика за сезон
+  pointsPerGame   Float  @default(0)
+  reboundsPerGame Float  @default(0)
+  assistsPerGame  Float  @default(0)
+  stealsPerGame   Float  @default(0)
+  blocksPerGame   Float  @default(0)
+  minutesPerGame  Float  @default(0)
+  fgPercentage    Float  @default(0)
+  threePercentage Float  @default(0)
+  ftPercentage    Float  @default(0)
+  
+  isActive        Boolean @default(true)
+  photoUrl        String?
+  
+  playerStats     PlayerStats[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ========== МАТЧИ ==========
+model Match {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  status      String   @default("scheduled") // scheduled, finished, postponed
+  
+  homeTeamId  Int
+  homeTeam    Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  homeScore   Int?
+  
+  awayTeamId  Int
+  awayTeam    Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  awayScore   Int?
+  
+  createdById Int
+  createdBy   User     @relation("MatchCreator", fields: [createdById], references: [id])
+  
+  predictions Prediction[]
+  matchStats  MatchStats[]
+  playerStats PlayerStats[]
+  aiData      AITrainingData[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([homeTeamId, awayTeamId, date])
+}
+
+// ========== СТАТИСТИКА МАТЧЕЙ ==========
+model MatchStats {
+  id         Int   @id @default(autoincrement())
+  matchId    Int
+  match      Match @relation(fields: [matchId], references: [id])
+  
+  // Статистика по четвертям
+  homeQ1   Int?
+  homeQ2   Int?
+  homeQ3   Int?
+  homeQ4   Int?
+  homeOT   Int?
+  
+  awayQ1   Int?
+  awayQ2   Int?
+  awayQ3   Int?
+  awayQ4   Int?
+  awayOT   Int?
+  
+  // Командная статистика
+  homeFieldGoals    Int?
+  homeFieldAttempts Int?
+  homeThreePoints   Int?
+  homeThreeAttempts Int?
+  homeFreeThrows    Int?
+  homeFreeAttempts  Int?
+  homeRebounds      Int?
+  homeAssists       Int?
+  homeSteals        Int?
+  homeBlocks        Int?
+  homeTurnovers     Int?
+  homeFouls         Int?
+  
+  awayFieldGoals    Int?
+  awayFieldAttempts Int?
+  awayThreePoints   Int?
+  awayThreeAttempts Int?
+  awayFreeThrows    Int?
+  awayFreeAttempts  Int?
+  awayRebounds      Int?
+  awayAssists       Int?
+  awaySteals        Int?
+  awayBlocks        Int?
+  awayTurnovers     Int?
+  awayFouls         Int?
+  
+  createdAt DateTime @default(now())
+}
+
+// ========== СТАТИСТИКА ИГРОКОВ В МАТЧЕ ==========
+model PlayerStats {
+  id         Int      @id @default(autoincrement())
+  playerId   Int
+  player     Player   @relation(fields: [playerId], references: [id])
+  matchId    Int
+  match      Match    @relation(fields: [matchId], references: [id])
+  
+  minutes    Int?
+  points     Int?
+  rebounds   Int?
+  assists    Int?
+  steals     Int?
+  blocks     Int?
+  turnovers  Int?
+  fouls      Int?
+  
+  fieldGoals     Int?
+  fieldAttempts  Int?
+  threePoints    Int?
+  threeAttempts  Int?
+  freeThrows     Int?
+  freeAttempts   Int?
+  
+  plusMinus      Int?
+  isStarter      Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+}
+
+// ========== СТАТИСТИКА КОМАНД ПО СЕЗОНАМ ==========
+model TeamStats {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  team      Team     @relation(fields: [teamId], references: [id])
+  season    String   // "2025-26"
+  
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  winPct    Float    @default(0)
+  
+  pointsPerGame  Float @default(0)
+  reboundsPerGame Float @default(0)
+  assistsPerGame  Float @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamId, season])
+}
+
+// ========== ПРОГНОЗЫ AI ==========
+model Prediction {
+  id          String   @id @default(uuid())
+  
+  matchId     Int?
+  match       Match?   @relation(fields: [matchId], references: [id])
+  
+  team1Id     Int
+  team1       Team     @relation("Team1", fields: [team1Id], references: [id])
+  team2Id     Int
+  team2       Team     @relation("Team2", fields: [team2Id], references: [id])
+  
+  probabilityTeam1 Float
+  probabilityTeam2 Float
+  expectedScoreTeam1 Int
+  expectedScoreTeam2 Int
+  
+  confidence  Float?
+  modelVersion String?
+  
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  
+  wasCorrect  Boolean?
+  
+  createdAt DateTime @default(now())
+}
+
+// ========== ЖУРНАЛ ДЕЙСТВИЙ (АУДИТ) ==========
+model AuditLog {
+  id         String   @id @default(uuid())
+  
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id])
+  
+  action     String   // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, BACKUP
+  entity     String   // Team, Match, User, Prediction
+  entityId   Int?
+  details    Json?
+  
+  ipAddress  String?
+  userAgent  String?
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ========== ДАННЫЕ ДЛЯ AI ==========
+model AITrainingData {
+  id         String   @id @default(uuid())
+  
+  team1Id    Int
+  team1      Team     @relation("AITeam1", fields: [team1Id], references: [id])
+  team2Id    Int
+  team2      Team     @relation("AITeam2", fields: [team2Id], references: [id])
+  
+  team1WinRate   Float
+  team1AvgScore  Float
+  team2WinRate   Float
+  team2AvgScore  Float
+  homeTeamId     Int?
+  
+  actualWinnerId Int?
+  actualScore1   Int?
+  actualScore2   Int?
+  
+  matchId        Int?
+  match          Match? @relation(fields: [matchId], references: [id])
+  
+  usedForTraining Boolean @default(false)
+  createdAt      DateTime @default(now())
+}
+
+// ========== ИСТОРИЧЕСКИЕ ДАННЫЕ ==========
+model HistoricalData {
+  id         String   @id @default(uuid())
+  
+  team1Id    Int
+  team1      Team     @relation("HistTeam1", fields: [team1Id], references: [id])
+  team2Id    Int
+  team2      Team     @relation("HistTeam2", fields: [team2Id], references: [id])
+  
+  matchDate  DateTime
+  season     String
+  
+  team1WinRate     Float
+  team1AvgScore    Float
+  team1AvgConceded Float
+  team2WinRate     Float
+  team2AvgScore    Float
+  team2AvgConceded Float
+  
+  team1Form        String?
+  team2Form        String?
+  
+  headToHeadWins1  Int?
+  headToHeadWins2  Int?
+  
+  actualWinnerId   Int?
+  actualScore1     Int?
+  actualScore2     Int?
+  pointDifference  Int?
+  
+  usedForTraining  Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+}
+
+// ========== РЕЗЕРВНЫЕ КОПИИ ==========
+model Backup {
+  id         String   @id @default(uuid())
+  
+  filename   String
+  size       Int
+  type       String   // manual, automatic
+  status     String   // completed, failed
+  
+  createdBy  Int?
+  user       User?    @relation(fields: [createdBy], references: [id])
+  
+  createdAt DateTime @default(now())
+}
+// Модель для All-Star выборов
+model AllStarSelection {
+  id        Int      @id @default(autoincrement())
+  season    String   // сезон, например "2024"
+  lg        String   // лига: "NBA", "ABA"
+  type      String   // "all_nba", "all_rookie", "all_defense"
+  numberTm  Int?     // номер команды (для all_nba: 1T, 2T, 3T)
+  position  String?  // позиция игрока
+  player    String
+  playerId  String
+  age       Int?
+  ptsWon    Int?     // полученные очки голосования
+  ptsMax    Int?     // максимум очков
+  share     Float?   // доля
+  x1stTm    Int?     // голоса за первую команду
+  x2ndTm    Int?     // голоса за вторую команду
+  x3rdTm    Int?     // голоса за третью команду
+
+  playerRef Player?  @relation(fields: [playerId], references: [fullName])
+  
+  @@unique([playerId, season, type])
+}
+
+// Модель для истории драфта
+model DraftPick {
+  id           Int      @id @default(autoincrement())
+  season       String   // год драфта
+  lg           String   // лига
+  overallPick  Int      // общий номер пика
+  round        Int      // раунд
+  tm           String   // команда, которая выбрала
+  player       String
+  playerId     String
+  college      String?  // колледж/университет или "NA"
+
+  playerRef    Player?  @relation(fields: [playerId], references: [fullName])
+  
+  @@unique([playerId, season])
+}
