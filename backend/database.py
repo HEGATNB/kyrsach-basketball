@@ -6,18 +6,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Подключение к PostgreSQL (можно заменить на SQLite для разработки)
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "postgresql://user:password@localhost/nba_predictor"
-)
+# Используем отдельные параметры из .env
+DB_NAME = os.getenv("DB_NAME", "nba")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "12345678")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+
+# Собираем URL
+SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+print(f"🔌 Подключение к БД: postgresql://{DB_USER}:****@{DB_HOST}:{DB_PORT}/{DB_NAME}")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-# Dependency для получения сессии БД
 def get_db():
     db = SessionLocal()
     try:

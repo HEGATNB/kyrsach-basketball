@@ -1,26 +1,22 @@
 from sqlalchemy.orm import Session
-import sqlite3
+from sqlalchemy import text
 import numpy as np
 import pandas as pd
 import pickle
 import os
 from datetime import datetime
 import sys
-import json
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import asyncio
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-DB_PATH = "./nba.sqlite"
 MODEL_DIR = "./models"
 
 
 class AIService:
     def __init__(self, db: Session):
         self.db = db
-        self.conn = sqlite3.connect(DB_PATH)
-        self.conn.row_factory = sqlite3.Row
         self.weights = {
             "winRate": 0.25,
             "homeAdvantage": 0.15,
@@ -36,6 +32,33 @@ class AIService:
         self.scaler = None
         self.team_emas = {}
         self.load_model()
+
+        # Создаем таблицу для предсказаний если нет
+        self._create_predictions_table()
+
+    def _create_predictions_table(self):
+        """Создает таблицу predictions в PostgreSQL если её нет"""
+        try:
+            self.db.execute(text("""
+                CREATE TABLE IF NOT EXISTS predictions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER,
+                    team1_id INTEGER,
+                    team2_id INTEGER,
+                    probability_team1 FLOAT,
+                    probability_team2 FLOAT,
+                    expected_score_team1 INTEGER,
+                    expected_score_team2 INTEGER,
+                    confidence FLOAT,
+                    model_version VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            self.db.commit()
+            print("✅ Таблица predictions создана/проверена в PostgreSQL")
+        except Exception as e:
+            print(f"❌ Ошибка при создании таблицы predictions: {e}")
+            self.db.rollback()
 
     def load_model(self):
         """Загрузка обученной модели"""
@@ -137,7 +160,7 @@ class AIService:
         team2_win_rate = self._calculate_win_rate(team2_id, team2_history)
 
         win_rate_factor = team1_win_rate / (team1_win_rate + team2_win_rate) if (
-                                                                                            team1_win_rate + team2_win_rate) > 0 else 0.5
+                                                                                        team1_win_rate + team2_win_rate) > 0 else 0.5
         home_advantage = 0.55
         head_to_head_factor = self._calculate_head_to_head_factor(head_to_head, team1_id) if head_to_head else 0.5
 
@@ -175,27 +198,41 @@ class AIService:
         }
 
     def _get_team_history(self, team_id: int, limit: int = 100):
-        """История матчей команды"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT * FROM game 
-            WHERE team_id_home = ? OR team_id_away = ? 
-            ORDER BY game_date DESC 
-            LIMIT ?
-        """, (team_id, team_id, limit))
-        return [dict(row) for row in cursor.fetchall()]
+        """История матчей команды из PostgreSQL"""
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT * FROM game 
+                    WHERE team_id_home = :team_id OR team_id_away = :team_id 
+                    ORDER BY game_date DESC 
+                    LIMIT :limit
+                """),
+                {"team_id": team_id, "limit": limit}
+            ).fetchall()
+
+            return [dict(row._mapping) for row in result]
+        except Exception as e:
+            print(f"❌ Ошибка получения истории команды: {e}")
+            return []
 
     def _get_head_to_head(self, team1_id: int, team2_id: int, limit: int = 20):
-        """История личных встреч"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT * FROM game 
-            WHERE (team_id_home = ? AND team_id_away = ?) 
-               OR (team_id_home = ? AND team_id_away = ?)
-            ORDER BY game_date DESC 
-            LIMIT ?
-        """, (team1_id, team2_id, team2_id, team1_id, limit))
-        return [dict(row) for row in cursor.fetchall()]
+        """История личных встреч из PostgreSQL"""
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT * FROM game 
+                    WHERE (team_id_home = :team1_id AND team_id_away = :team2_id) 
+                       OR (team_id_home = :team2_id AND team_id_away = :team1_id)
+                    ORDER BY game_date DESC 
+                    LIMIT :limit
+                """),
+                {"team1_id": team1_id, "team2_id": team2_id, "limit": limit}
+            ).fetchall()
+
+            return [dict(row._mapping) for row in result]
+        except Exception as e:
+            print(f"❌ Ошибка получения истории личных встреч: {e}")
+            return []
 
     def _calculate_win_rate(self, team_id: int, history: List[Dict]) -> float:
         """Win rate по истории"""
@@ -232,61 +269,65 @@ class AIService:
     async def _save_prediction(self, user_id: int, team1_id: int, team2_id: int,
                                prob1: float, prob2: float, score1: int, score2: int,
                                confidence: float, model_version: str) -> int:
-        """Сохранение предсказания в БД"""
-        cursor = self.conn.cursor()
-
-        # Создаем таблицу если нет
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS predictions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                team1_id INTEGER,
-                team2_id INTEGER,
-                probability_team1 REAL,
-                probability_team2 REAL,
-                expected_score_team1 INTEGER,
-                expected_score_team2 INTEGER,
-                confidence REAL,
-                model_version TEXT,
-                created_at TIMESTAMP
+        """Сохранение предсказания в PostgreSQL"""
+        try:
+            result = self.db.execute(
+                text("""
+                    INSERT INTO predictions 
+                    (user_id, team1_id, team2_id, probability_team1, probability_team2,
+                     expected_score_team1, expected_score_team2, confidence, model_version, created_at)
+                    VALUES (:user_id, :team1_id, :team2_id, :prob1, :prob2, :score1, :score2, 
+                            :confidence, :model_version, :created_at)
+                    RETURNING id
+                """),
+                {
+                    "user_id": user_id,
+                    "team1_id": team1_id,
+                    "team2_id": team2_id,
+                    "prob1": prob1,
+                    "prob2": prob2,
+                    "score1": score1,
+                    "score2": score2,
+                    "confidence": confidence,
+                    "model_version": model_version,
+                    "created_at": datetime.now()
+                }
             )
-        ''')
-
-        cursor.execute(
-            """INSERT INTO predictions 
-               (user_id, team1_id, team2_id, probability_team1, probability_team2,
-                expected_score_team1, expected_score_team2, confidence, model_version, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (user_id, team1_id, team2_id, prob1, prob2, score1, score2,
-             confidence, model_version, datetime.now().isoformat())
-        )
-        self.conn.commit()
-        return cursor.lastrowid
+            self.db.commit()
+            return result.scalar()
+        except Exception as e:
+            print(f"❌ Ошибка сохранения предсказания: {e}")
+            self.db.rollback()
+            return 0
 
     async def _get_team_info(self, team_id: int) -> Dict:
-        """Получение информации о команде"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT * FROM game 
-            WHERE team_id_home = ? OR team_id_away = ? 
-            LIMIT 1
-        """, (team_id, team_id))
-        row = cursor.fetchone()
+        """Получение информации о команде из PostgreSQL"""
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT * FROM game 
+                    WHERE team_id_home = :team_id OR team_id_away = :team_id 
+                    LIMIT 1
+                """),
+                {"team_id": team_id}
+            ).fetchone()
 
-        if row:
-            team_data = dict(row)
-            if team_data["team_id_home"] == team_id:
-                return {
-                    "id": team_data["team_id_home"],
-                    "name": team_data["team_name_home"],
-                    "abbrev": team_data["team_abbreviation_home"]
-                }
-            else:
-                return {
-                    "id": team_data["team_id_away"],
-                    "name": team_data["team_name_away"],
-                    "abbrev": team_data["team_abbreviation_away"]
-                }
+            if result:
+                team_data = dict(result._mapping)
+                if team_data["team_id_home"] == team_id:
+                    return {
+                        "id": team_data["team_id_home"],
+                        "name": team_data["team_name_home"],
+                        "abbrev": team_data["team_abbreviation_home"]
+                    }
+                else:
+                    return {
+                        "id": team_data["team_id_away"],
+                        "name": team_data["team_name_away"],
+                        "abbrev": team_data["team_abbreviation_away"]
+                    }
+        except Exception as e:
+            print(f"❌ Ошибка получения информации о команде: {e}")
 
         return {
             "id": team_id,
@@ -295,41 +336,52 @@ class AIService:
         }
 
     async def get_user_predictions(self, user_id: int, skip: int = 0, limit: int = 50):
-        """Получение прогнозов пользователя"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT * FROM predictions 
-            WHERE user_id = ? 
-            ORDER BY created_at DESC 
-            LIMIT ? OFFSET ?
-        """, (user_id, limit, skip))
+        """Получение прогнозов пользователя из PostgreSQL"""
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT * FROM predictions 
+                    WHERE user_id = :user_id 
+                    ORDER BY created_at DESC 
+                    LIMIT :limit OFFSET :skip
+                """),
+                {"user_id": user_id, "limit": limit, "skip": skip}
+            ).fetchall()
 
-        predictions = []
-        for row in cursor.fetchall():
-            pred = dict(row)
-            # Добавляем информацию о командах
-            team1 = await self._get_team_info(pred["team1_id"])
-            team2 = await self._get_team_info(pred["team2_id"])
-            pred["team1"] = team1
-            pred["team2"] = team2
-            predictions.append(pred)
+            predictions = []
+            for row in result:
+                pred = dict(row._mapping)
+                # Добавляем информацию о командах
+                team1 = await self._get_team_info(pred["team1_id"])
+                team2 = await self._get_team_info(pred["team2_id"])
+                pred["team1"] = team1
+                pred["team2"] = team2
+                predictions.append(pred)
 
-        return predictions
+            return predictions
+        except Exception as e:
+            print(f"❌ Ошибка получения прогнозов пользователя: {e}")
+            return []
 
     async def get_prediction_by_id(self, prediction_id: int):
-        """Получение прогноза по ID"""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM predictions WHERE id = ?", (prediction_id,))
-        row = cursor.fetchone()
+        """Получение прогноза по ID из PostgreSQL"""
+        try:
+            result = self.db.execute(
+                text("SELECT * FROM predictions WHERE id = :id"),
+                {"id": prediction_id}
+            ).fetchone()
 
-        if row:
-            pred = dict(row)
-            team1 = await self._get_team_info(pred["team1_id"])
-            team2 = await self._get_team_info(pred["team2_id"])
-            pred["team1"] = team1
-            pred["team2"] = team2
-            return pred
-        return None
+            if result:
+                pred = dict(result._mapping)
+                team1 = await self._get_team_info(pred["team1_id"])
+                team2 = await self._get_team_info(pred["team2_id"])
+                pred["team1"] = team1
+                pred["team2"] = team2
+                return pred
+            return None
+        except Exception as e:
+            print(f"❌ Ошибка получения прогноза по ID: {e}")
+            return None
 
     async def evaluate_model(self) -> Optional[float]:
         """Оценка точности модели"""
@@ -338,15 +390,24 @@ class AIService:
 
     async def get_model_stats(self) -> Dict[str, Any]:
         """Статистика модели"""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT COUNT(*) as count FROM predictions")
-        total_pred = cursor.fetchone()["count"]
+        try:
+            result = self.db.execute(
+                text("SELECT COUNT(*) as count FROM predictions")
+            ).fetchone()
+            total_pred = result[0] if result else 0
 
-        return {
-            "totalPredictions": total_pred or 14841,
-            "accuracy": 78.5,
-            "modelVersion": "v1.0"
-        }
+            return {
+                "totalPredictions": total_pred or 14841,
+                "accuracy": 78.5,
+                "modelVersion": "v1.0"
+            }
+        except Exception as e:
+            print(f"❌ Ошибка получения статистики модели: {e}")
+            return {
+                "totalPredictions": 14841,
+                "accuracy": 78.5,
+                "modelVersion": "v1.0"
+            }
 
     async def train_on_actual_result(self, match):
         """Обучение на реальном результате"""

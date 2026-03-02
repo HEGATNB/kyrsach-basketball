@@ -1,0 +1,47 @@
+2. Создание базы данных
+
+Через pgAdmin:
+
+    Откройте pgAdmin
+
+    Подключитесь к серверу (пароль, который задали при установке)
+
+    Правый клик на "Databases" → "Create" → "Database"
+
+    Имя базы: nba
+
+    Owner: postgres
+
+    Нажмите "Save"
+
+Через командную строку:
+sql
+
+CREATE DATABASE nba;
+
+3. Импорт .sql файла
+
+Через pgAdmin:
+
+    Правый клик на базе nba
+
+    Выберите "Restore..."
+
+    В поле "Filename" выберите ваш .sql файл
+
+    Нажмите "Restore"
+
+Через командную строку (если файл большой):
+bash
+
+psql -U postgres -d nba -f путь_к_файлу.sql
+
+4. Проверка импорта
+
+В pgAdmin:
+
+    Откройте базу nba
+
+    Разверните "Schemas" → "public" → "Tables"
+
+    Должны увидеть таблицы: users, game, audit_logs, predictions

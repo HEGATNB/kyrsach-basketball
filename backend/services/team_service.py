@@ -1,113 +1,165 @@
 from sqlalchemy.orm import Session
-import sqlite3
+from sqlalchemy import text
 from datetime import datetime
 import sys
 import os
 from typing import List, Optional, Dict
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import schemas
-
-DB_PATH = "./nba.sqlite"
 
 
 class TeamService:
     def __init__(self, db: Session):
         self.db = db
-        self.conn = sqlite3.connect(DB_PATH)
-        self.conn.row_factory = sqlite3.Row
 
     def get_all_teams(self, skip: int = 0, limit: int = 100):
         """Получение всех команд"""
-        cursor = self.conn.cursor()
+        try:
+            # Проверяем есть ли таблица game
+            table_check = self.db.execute(
+                text("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'game')")
+            ).scalar()
 
-        # Проверяем есть ли таблица game с командами
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='game'")
-        if cursor.fetchone():
-            cursor.execute("""
-                SELECT DISTINCT 
-                    team_id_home as id, 
-                    team_name_home as name, 
-                    team_abbreviation_home as abbrev,
-                    team_name_home as full_name,
-                    '' as city,
-                    '' as arena,
-                    0 as founded_year,
-                    0 as conference_id,
-                    0 as division_id,
-                    0 as championships,
-                    0 as wins,
-                    0 as losses,
-                    0 as points_per_game,
-                    0 as points_against
-                FROM game 
-                UNION 
-                SELECT DISTINCT 
-                    team_id_away as id, 
-                    team_name_away as name, 
-                    team_abbreviation_away as abbrev,
-                    team_name_away as full_name,
-                    '' as city,
-                    '' as arena,
-                    0 as founded_year,
-                    0 as conference_id,
-                    0 as division_id,
-                    0 as championships,
-                    0 as wins,
-                    0 as losses,
-                    0 as points_per_game,
-                    0 as points_against
-                FROM game
-                LIMIT ? OFFSET ?
-            """, (limit, skip))
-        else:
-            # Демо-данные
-            cursor.execute("""
-                SELECT 1 as id, 'Boston Celtics' as name, 'BOS' as abbrev, 'Boston Celtics' as full_name,
-                       'Boston' as city, 'TD Garden' as arena, 1946 as founded_year,
-                       1 as conference_id, 1 as division_id, 17 as championships,
-                       48 as wins, 24 as losses, 118.5 as points_per_game, 112.3 as points_against
-                UNION
-                SELECT 2, 'Los Angeles Lakers', 'LAL', 'Los Angeles Lakers',
-                       'Los Angeles', 'Crypto.com Arena', 1947, 1, 2, 17,
-                       43, 29, 116.2, 114.1
-                UNION
-                SELECT 3, 'Golden State Warriors', 'GSW', 'Golden State Warriors',
-                       'San Francisco', 'Chase Center', 1946, 1, 3, 7,
-                       41, 31, 118.9, 115.2
-                LIMIT ? OFFSET ?
-            """, (limit, skip))
+            if table_check:
+                result = self.db.execute(
+                    text("""
+                        SELECT DISTINCT 
+                            team_id_home as id, 
+                            team_name_home as name, 
+                            team_abbreviation_home as abbrev,
+                            team_name_home as full_name,
+                            COALESCE(split_part(team_name_home, ' ', 1), '') as city,
+                            team_name_home || ' Arena' as arena,
+                            1970 as founded_year,
+                            1 as conference_id,
+                            1 as division_id,
+                            1 as championships,
+                            41 as wins,
+                            41 as losses,
+                            110.5 as points_per_game,
+                            109.8 as points_against
+                        FROM game 
+                        UNION 
+                        SELECT DISTINCT 
+                            team_id_away as id, 
+                            team_name_away as name, 
+                            team_abbreviation_away as abbrev,
+                            team_name_away as full_name,
+                            COALESCE(split_part(team_name_away, ' ', 1), '') as city,
+                            team_name_away || ' Arena' as arena,
+                            1970 as founded_year,
+                            1 as conference_id,
+                            1 as division_id,
+                            1 as championships,
+                            41 as wins,
+                            41 as losses,
+                            110.5 as points_per_game,
+                            109.8 as points_against
+                        FROM game
+                        ORDER BY name
+                        LIMIT :limit OFFSET :skip
+                    """),
+                    {"limit": limit, "skip": skip}
+                ).fetchall()
 
-        return [dict(row) for row in cursor.fetchall()]
+                return [dict(row._mapping) for row in result]
+            else:
+                # Демо-данные
+                return self._get_demo_teams(skip, limit)
+        except Exception as e:
+            print(f"❌ Ошибка получения команд: {e}")
+            return self._get_demo_teams(skip, limit)
+
+    def _get_demo_teams(self, skip: int = 0, limit: int = 100):
+        """Возвращает демо-данные команд"""
+        demo_teams = [
+            {
+                "id": 1,
+                "name": "Boston Celtics",
+                "abbrev": "BOS",
+                "full_name": "Boston Celtics",
+                "city": "Boston",
+                "arena": "TD Garden",
+                "founded_year": 1946,
+                "conference_id": 1,
+                "division_id": 1,
+                "championships": 17,
+                "wins": 48,
+                "losses": 24,
+                "points_per_game": 118.5,
+                "points_against": 112.3
+            },
+            {
+                "id": 2,
+                "name": "Los Angeles Lakers",
+                "abbrev": "LAL",
+                "full_name": "Los Angeles Lakers",
+                "city": "Los Angeles",
+                "arena": "Crypto.com Arena",
+                "founded_year": 1947,
+                "conference_id": 1,
+                "division_id": 2,
+                "championships": 17,
+                "wins": 43,
+                "losses": 29,
+                "points_per_game": 116.2,
+                "points_against": 114.1
+            },
+            {
+                "id": 3,
+                "name": "Golden State Warriors",
+                "abbrev": "GSW",
+                "full_name": "Golden State Warriors",
+                "city": "San Francisco",
+                "arena": "Chase Center",
+                "founded_year": 1946,
+                "conference_id": 1,
+                "division_id": 3,
+                "championships": 7,
+                "wins": 41,
+                "losses": 31,
+                "points_per_game": 118.9,
+                "points_against": 115.2
+            }
+        ]
+
+        # Применяем skip и limit
+        start = skip if skip < len(demo_teams) else len(demo_teams)
+        end = min(start + limit, len(demo_teams))
+
+        return demo_teams[start:end]
 
     def get_team_by_id(self, team_id: int):
         """Получение команды по ID"""
-        cursor = self.conn.cursor()
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT * FROM game WHERE team_id_home = :team_id OR team_id_away = :team_id LIMIT 1
+                """),
+                {"team_id": team_id}
+            ).fetchone()
 
-        cursor.execute("""
-            SELECT * FROM game WHERE team_id_home = ? OR team_id_away = ? LIMIT 1
-        """, (team_id, team_id))
-
-        row = cursor.fetchone()
-        if row:
-            team_data = dict(row)
-            if team_data["team_id_home"] == team_id:
-                return {
-                    "id": team_data["team_id_home"],
-                    "name": team_data["team_name_home"],
-                    "abbrev": team_data["team_abbreviation_home"],
-                    "full_name": team_data["team_name_home"],
-                    "city": team_data["team_name_home"].split()[-1] if " " in team_data["team_name_home"] else "",
-                    "arena": f"{team_data['team_name_home']} Arena",
-                    "founded_year": 1970,
-                    "conference_id": 1,
-                    "division_id": 1,
-                    "championships": 1,
-                    "wins": 41,
-                    "losses": 41,
-                    "points_per_game": 110.5,
-                    "points_against": 109.8
-                }
+            if result:
+                team_data = dict(result._mapping)
+                if team_data["team_id_home"] == team_id:
+                    return {
+                        "id": team_data["team_id_home"],
+                        "name": team_data["team_name_home"],
+                        "abbrev": team_data["team_abbreviation_home"],
+                        "full_name": team_data["team_name_home"],
+                        "city": team_data["team_name_home"].split()[-1] if " " in team_data["team_name_home"] else "",
+                        "arena": f"{team_data['team_name_home']} Arena",
+                        "founded_year": 1970,
+                        "conference_id": 1,
+                        "division_id": 1,
+                        "championships": 1,
+                        "wins": 41,
+                        "losses": 41,
+                        "points_per_game": 110.5,
+                        "points_against": 109.8
+                    }
+        except Exception as e:
+            print(f"❌ Ошибка получения команды по ID: {e}")
 
         # Демо-данные для известных ID
         demo_teams = {
@@ -139,15 +191,26 @@ class TeamService:
 
     def get_team_by_name(self, name: str):
         """Получение команды по названию"""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM game WHERE team_name_home = ? OR team_name_away = ? LIMIT 1", (name, name))
-        row = cursor.fetchone()
-        if row:
-            team_data = dict(row)
-            return {
-                "id": team_data["team_id_home"] if team_data["team_name_home"] == name else team_data["team_id_away"],
-                "name": name
-            }
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT * FROM game 
+                    WHERE team_name_home = :name OR team_name_away = :name 
+                    LIMIT 1
+                """),
+                {"name": name}
+            ).fetchone()
+
+            if result:
+                team_data = dict(result._mapping)
+                return {
+                    "id": team_data["team_id_home"] if team_data["team_name_home"] == name else team_data[
+                        "team_id_away"],
+                    "name": name
+                }
+        except Exception as e:
+            print(f"❌ Ошибка получения команды по названию: {e}")
+
         return None
 
     def create_team(self, team_data, user_id: int):

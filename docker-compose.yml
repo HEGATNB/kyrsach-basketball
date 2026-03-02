@@ -32,6 +32,9 @@ services:
       POSTGRES_DB: hoopstat_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/postgres/init:/docker-entrypoint-initdb.d  # добавляем эту строку
+    ports:
+      - "5432:5432"  # опционально: открыть порт для внешнего доступа
 
 volumes:
   postgres_data:

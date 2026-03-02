@@ -1,4 +1,5 @@
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -11,11 +12,19 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------------
 # Configuration
 # ---------------------------
-DB_PATH = "../nba.sqlite"
+DB_NAME = os.getenv("DB_NAME", "nba")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "12345678")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+
 MODEL_DIR = "../models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
@@ -37,9 +46,21 @@ MIN_GAMES = 5
 # ---------------------------
 # Data Loading & Preprocessing
 # ---------------------------
-def load_games(db_path):
-    """Load game table from SQLite."""
-    conn = sqlite3.connect(db_path)
+def get_db_connection():
+    """Создает подключение к PostgreSQL"""
+    conn = psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        cursor_factory=RealDictCursor
+    )
+    return conn
+
+def load_games():
+    """Load game table from PostgreSQL."""
+    conn = get_db_connection()
     query = "SELECT * FROM game ORDER BY game_date"
     df = pd.read_sql_query(query, conn)
     conn.close()
@@ -192,10 +213,18 @@ def build_model(input_dim):
 # ---------------------------
 # Training Pipeline
 # ---------------------------
-def train_model(db_path):
-    print("Loading data...")
-    df = load_games(db_path)
+def train_model(db_path=None):
+    """
+    Обучает модель на данных из PostgreSQL.
+    Параметр db_path оставлен для совместимости, но не используется
+    """
+    print("Loading data from PostgreSQL...")
+    df = load_games()
     print(f"Total games: {len(df)}")
+
+    if len(df) == 0:
+        print("❌ Нет данных для обучения")
+        return None, None, None
 
     print("Preprocessing and building dataset with EMA...")
     X, y, weights, team_emas, game_dates = preprocess_and_build_dataset(df)
@@ -238,7 +267,7 @@ def train_model(db_path):
         pickle.dump(team_emas, f)
 
     # Also save team names mapping (from game table)
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection()
     teams_df = pd.read_sql_query("SELECT DISTINCT team_id_home as team_id, team_name_home as team_name, team_abbreviation_home as team_abbrev FROM game", conn)
     conn.close()
     teams_df.to_csv(os.path.join(MODEL_DIR, "teams.csv"), index=False)
@@ -260,7 +289,7 @@ def fetch_new_games_from_espn(season=None):
     # Example stub: return empty list
     return []
 
-def update_model_with_new_data(db_path, new_games_df):
+def update_model_with_new_data(new_games_df):
     """
     Append new games to database and retrain model incrementally or fully.
     For simplicity, we just retrain from scratch.
@@ -273,8 +302,4 @@ def update_model_with_new_data(db_path, new_games_df):
 # Main
 # ---------------------------
 if __name__ == "__main__":
-    train_model(DB_PATH)
-    # Uncomment to simulate retraining:
-    # new_data = fetch_new_games_from_espn()
-    # if new_data:
-    #     update_model_with_new_data(DB_PATH, new_data)
+    train_model()

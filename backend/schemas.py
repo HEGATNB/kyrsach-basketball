@@ -86,9 +86,11 @@ class MatchResponse(MatchBase):
 
 # Prediction schemas
 class PredictionRequest(BaseModel):
-    team1_id: int
-    team2_id: int
+    team1_id: int = Field(..., alias="team1Id")
+    team2_id: int = Field(..., alias="team2Id")
 
+    class Config:
+        populate_by_name = True
 class PredictionResponse(BaseModel):
     id: int
     team1_id: int
