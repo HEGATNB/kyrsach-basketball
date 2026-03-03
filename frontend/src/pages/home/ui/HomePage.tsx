@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Activity, 
@@ -8,13 +8,19 @@ import {
   Flame, 
   Target, 
   Zap,
-  Users,
-  AlertCircle
+  Users
 } from 'lucide-react';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
-import { apiRequest, Team, Match, Prediction } from '@/shared/api/client';
+import { apiRequest } from '@/shared/api/client';
+import type { Team, Match, Prediction } from '@/shared/api/client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { 
+  LineChartComponent, 
+  BarChartComponent, 
+  PieChartComponent, 
+  RadarChartComponent 
+} from '@/shared/ui/Charts';
 
 export const HomePage = () => {
   const { user } = useAuth();
@@ -90,6 +96,17 @@ export const HomePage = () => {
           <p className="text-slate-400 text-lg mt-2 max-w-2xl">
             Платформа продвинутой аналитики NBA с интеграцией нейросетей
           </p>
+          {!user && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/auth')}
+              className="mt-6 px-8 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 flex items-center gap-2"
+            >
+              <Zap className="w-5 h-5" />
+              Зарегистрироваться
+            </motion.button>
+          )}
         </div>
         <div className="flex items-center gap-3 bg-slate-900/50 backdrop-blur-xl px-4 py-2 rounded-2xl border border-slate-800/50">
           <span className="relative flex h-3 w-3">
@@ -97,7 +114,7 @@ export const HomePage = () => {
             <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
           </span>
           <span className="text-sm font-medium text-green-400 animate-pulse">
-            {user ? `Привет, ${user.name}` : 'SYSTEM ONLINE'}
+            {user ? `Привет, ${user.username}` : 'SYSTEM ONLINE'}
           </span>
         </div>
       </motion.div>
@@ -134,7 +151,6 @@ export const HomePage = () => {
         {/* AI Predictor */}
         <GlowingCard
           glowColor="orange"
-          intensity="high"
           className="lg:col-span-2 p-8"
         >
           <div className="flex items-center justify-between mb-6">
@@ -226,7 +242,7 @@ export const HomePage = () => {
           </GlowingCard>
 
           {/* Последние матчи */}
-          <GlowingCard glowColor="red" className="p-6">
+          <GlowingCard glowColor="orange" className="p-6">
             <div className="flex items-center gap-2 mb-4">
               <Flame className="w-5 h-5 text-red-400" />
               <h3 className="font-bold">Последние матчи</h3>
@@ -298,14 +314,41 @@ export const HomePage = () => {
           </div>
         </GlowingCard>
       )}
+
+      {/* Графики статистики */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <LineChartComponent
+          title="Точность модели по месяцам"
+          data={accuracyData}
+          dataKey="accuracy"
+          xAxisKey="month"
+        />
+        
+        <BarChartComponent
+          title="Активность прогнозов"
+          data={predictionsData}
+          dataKey="count"
+          xAxisKey="day"
+        />
+        
+        <PieChartComponent
+          title="Точность прогнозов"
+          data={pieData}
+          nameKey="name"
+          valueKey="value"
+        />
+        
+        <RadarChartComponent
+          title="Сравнение топ-команд"
+          data={teamComparisonData}
+          dataKeys={['Lakers', 'Celtics', 'Warriors']}
+        />
+      </div>
     </div>
   );
 };
 
-export default HomePage;
-import { LineChartComponent, BarChartComponent, PieChartComponent, RadarChartComponent } from '@/shared/ui/Charts';
-
-// Добавь данные для графиков
+// Данные для графиков
 const accuracyData = [
   { month: 'Янв', accuracy: 65 },
   { month: 'Фев', accuracy: 68 },
@@ -341,32 +384,4 @@ const teamComparisonData = [
   { metric: 'Блоки', Lakers: 5, Celtics: 6, Warriors: 5 },
 ];
 
-// Добавь этот JSX в конец return (после последнего GlowingCard)
-<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-  <LineChartComponent
-    title="Точность модели по месяцам"
-    data={accuracyData}
-    dataKey="accuracy"
-    xAxisKey="month"
-  />
-  
-  <BarChartComponent
-    title="Активность прогнозов"
-    data={predictionsData}
-    dataKey="count"
-    xAxisKey="day"
-  />
-  
-  <PieChartComponent
-    title="Точность прогнозов"
-    data={pieData}
-    nameKey="name"
-    valueKey="value"
-  />
-  
-  <RadarChartComponent
-    title="Сравнение топ-команд"
-    data={teamComparisonData}
-    dataKeys={['Lakers', 'Celtics', 'Warriors']}
-  />
-</div>
+export default HomePage;

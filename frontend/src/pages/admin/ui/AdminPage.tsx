@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/app/providers/AuthProvider';
@@ -10,17 +10,13 @@ import {
   Database, 
   Activity, 
   Download, 
-  Upload,
-  Trash2,
-  PlusCircle,
-  RefreshCw,
-  AlertCircle
+  PlusCircle
 } from 'lucide-react';
 
 interface User {
   id: number;
   email: string;
-  name: string;
+  username: string;
   role: string;
   isBlocked: boolean;
   createdAt: string;
@@ -33,7 +29,7 @@ interface AuditLog {
   details: any;
   createdAt: string;
   user?: {
-    name: string;
+    username: string;
     email: string;
   };
 }
@@ -48,14 +44,13 @@ interface Backup {
 }
 
 export const AdminPage = () => {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'backup' | 'stats'>('stats');
   const [users, setUsers] = useState<User[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(false);
-  const [backupJson, setBackupJson] = useState('');
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
@@ -242,9 +237,9 @@ export const AdminPage = () => {
                 </thead>
                 <tbody>
                   {users.map((u) => (
-                    <tr key={u.id} className="border-b border-slate-800/50">
+                      <tr key={u.id} className="border-b border-slate-800/50">
                       <td className="py-3">{u.id}</td>
-                      <td className="py-3">{u.name}</td>
+                      <td className="py-3">{u.username}</td>
                       <td className="py-3">{u.email}</td>
                       <td className="py-3">
                         <span className={`px-2 py-1 rounded-full text-xs ${
@@ -302,7 +297,7 @@ export const AdminPage = () => {
                   <p className="text-white">{log.details ? JSON.stringify(log.details) : ''}</p>
                   {log.user && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Пользователь: {log.user.name} ({log.user.email})
+                      Пользователь: {log.user.username} ({log.user.email})
                     </p>
                   )}
                 </div>

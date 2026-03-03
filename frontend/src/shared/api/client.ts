@@ -1,17 +1,48 @@
-const API_BASE = 'http://localhost:3001/api';
+import type { Team } from "@/entities/team/model/types";
+import type { Match } from "@/entities/match/model/types";
+import type { Prediction } from "@/entities/prediction/model/types";
 
-export interface ApiResponse<T> {
-  data?: T;
-  error?: string;
+export interface Player {
+  id: number;
+  first_name: string;
+  last_name: string;
+  number?: number;
+  position?: string;
+  team_id: number;
+  height?: string;
+  weight?: number;
+  birth_date?: string;
+  points_per_game: number;
+  rebounds_per_game: number;
+  assists_per_game: number;
+  image_url?: string;
 }
 
-// Универсальная функция запроса
+export type { Team, Match, Prediction };
+
+const API_BASE = 'http://localhost:8000/api';
+
+// Простое кэширование в памяти
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 минут
+
 export async function apiRequest<T>(
   endpoint: string, 
-  options?: RequestInit
+  options?: RequestInit,
+  useCache: boolean = true
 ): Promise<T> {
   const token = localStorage.getItem('token');
+  const cacheKey = `${options?.method || 'GET'}-${endpoint}`;
   
+  // Только для GET-запросов используем кэш
+  if (useCache && (!options?.method || options.method === 'GET')) {
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`📦 Cache hit for ${endpoint}`);
+      return cached.data as T;
+    }
+  }
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -19,16 +50,14 @@ export async function apiRequest<T>(
   };
 
   try {
-    console.log(`📡 Запрос к ${API_BASE}${endpoint}`, options?.method || 'GET');
+    console.log(`📡 Запрос к ${API_BASE}${endpoint}`);
     
     const res = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,
     });
 
-    // Сначала получаем текст ответа
     const responseText = await res.text();
-    console.log(`📦 Ответ от ${endpoint}:`, responseText);
 
     if (!res.ok) {
       try {
@@ -39,14 +68,14 @@ export async function apiRequest<T>(
       }
     }
 
-    // Парсим JSON
-    try {
-      const data = JSON.parse(responseText) as T;
-      return data;
-    } catch (e) {
-      console.error('❌ Ошибка парсинга JSON:', responseText);
-      throw new Error('Неверный формат ответа от сервера');
+    const data = JSON.parse(responseText) as T;
+    
+    // Сохраняем в кэш для GET-запросов
+    if (!options?.method || options.method === 'GET') {
+      cache.set(cacheKey, { data, timestamp: Date.now() });
     }
+    
+    return data;
     
   } catch (err) {
     console.error(`❌ API Error (${endpoint}):`, err);
@@ -54,84 +83,8 @@ export async function apiRequest<T>(
   }
 }
 
-// Типы данных
-export interface Team {
-  id: number;
-  name: string;
-  abbrev: string;
-  fullName: string;
-  nickname: string;
-  city: string;
-  arena: string;
-  foundedYear: number;
-  championships: number;
-  wins: number;
-  losses: number;
-  pointsPerGame: number;
-  pointsAgainst: number;
-  conferenceId: number;
-  divisionId: number;
-  conference?: {
-    id: number;
-    name: string;
-    shortName: string;
-  };
-  division?: {
-    id: number;
-    name: string;
-  };
-}
-
-export interface Player {
-  id: number;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  position: string;
-  height: number;
-  weight: number;
-  pointsPerGame: number;
-  reboundsPerGame: number;
-  assistsPerGame: number;
-  teamId: number;
-  team?: Team;
-}
-
-export interface Match {
-  id: number;
-  date: string;
-  status: string;
-  homeTeamId: number;
-  homeTeam: Team;
-  homeScore: number;
-  awayTeamId: number;
-  awayTeam: Team;
-  awayScore: number;
-}
-
-export interface Prediction {
-  id: string;
-  probabilityTeam1: number;
-  probabilityTeam2: number;
-  expectedScoreTeam1: number;
-  expectedScoreTeam2: number;
-  confidence: number;
-  factors?: any;
-  team1Id: number;
-  team2Id: number;
-  team1?: Team;
-  team2?: Team;
-  createdAt: string;
-}
-
-export interface User {
-  id: number;
-  email: string;
-  name: string;
-  role: string;
-}
-
-export interface LoginResponse {
-  user: User;
-  token: string;
+// Функция для очистки кэша
+export function clearCache() {
+  cache.clear();
+  console.log('🧹 Cache cleared');
 }

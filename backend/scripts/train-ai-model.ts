@@ -16,6 +16,7 @@ async function trainAIModel() {
   // Анализируем данные
   let correctPredictions = 0;
   let totalPredictions = 0;
+  const processedIds: number[] = [];
 
   for (const data of trainingData) {
     // Простая эвристика: побеждает команда с лучшим win rate
@@ -29,8 +30,13 @@ async function trainAIModel() {
     totalPredictions++;
 
     // Отмечаем данные как использованные для обучения
-    await prisma.historicalData.update({
-      where: { id: data.id },
+    processedIds.push(data.id);
+  }
+
+  // Массовое обновление вместо обновления по одному
+  if (processedIds.length > 0) {
+    await prisma.historicalData.updateMany({
+      where: { id: { in: processedIds } },
       data: { usedForTraining: true }
     });
   }

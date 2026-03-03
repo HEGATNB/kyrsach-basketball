@@ -116,7 +116,7 @@ export const PredictionResultPage = () => {
         Новый прогноз
       </Link>
 
-      <GlowingCard glowColor="orange" intensity="high" className="p-8">
+      <GlowingCard glowColor="orange" className="p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Результат AI анализа</h1>
           <p className="text-slate-400">Уверенность модели: {prediction.confidence || 0}%</p>

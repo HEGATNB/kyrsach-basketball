@@ -1,19 +1,19 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import type { ReactNode } from 'react';
+import { motion, type HTMLMotionProps } from 'framer-motion';
 
-interface GlowingCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+interface GlowingCardProps extends HTMLMotionProps<"div"> {
+  children: ReactNode;
   glowColor?: 'orange' | 'blue' | 'green' | 'purple';
   delay?: number;
 }
 
-export const GlowingCard: React.FC<GlowingCardProps> = ({
+export function GlowingCard({
   children,
   className = '',
   glowColor = 'orange',
   delay = 0,
   ...props
-}) => {
+}: GlowingCardProps) {
   const glowColors = {
     orange: 'hover:shadow-orange-500/30',
     blue: 'hover:shadow-blue-500/30',
@@ -31,9 +31,9 @@ export const GlowingCard: React.FC<GlowingCardProps> = ({
       {...props}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <div className="relative z-10 p-6">
+      <div className="relative z-10">
         {children}
       </div>
     </motion.div>
   );
-};
+}

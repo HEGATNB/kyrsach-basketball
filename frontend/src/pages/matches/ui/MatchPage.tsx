@@ -73,7 +73,7 @@ export const MatchPage = () => {
         Назад к матчам
       </Link>
 
-      <GlowingCard glowColor="orange" intensity="high" className="p-8">
+      <GlowingCard glowColor="orange" className="p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">

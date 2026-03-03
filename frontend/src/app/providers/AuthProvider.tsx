@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { apiRequest, User, LoginResponse } from '@/shared/api/client';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { authService, type User } from './auth.service';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<boolean>;
+  register: (data: any) => Promise<boolean>;
   logout: () => void;
   isAdmin: boolean;
   isOperator: boolean;
@@ -18,44 +19,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Проверяем, есть ли сохраненный пользователь
-    const savedUser = localStorage.getItem('user');
     const token = localStorage.getItem('token');
     
-    if (savedUser && token) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error('Ошибка парсинга пользователя', e);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
+    if (token) {
+      // Если есть токен, пробуем получить данные пользователя
+      fetchUser();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const fetchUser = async () => {
     try {
-      const data = await apiRequest<LoginResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
+      const token = authService.getToken();
+      if (!token) throw new Error('No token');
+
+      const response = await fetch('http://localhost:8000/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
-      if (data.user && data.token) {
-        setUser(data.user);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('token', data.token);
-        return true;
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      } else {
+        logout();
       }
     } catch (e) {
-      console.error('Ошибка входа:', e);
+      console.error('Ошибка получения пользователя:', e);
+      logout();
+    } finally {
+      setLoading(false);
     }
-    return false;
+  };
+
+  const login = async (username: string, password: string) => {
+    try {
+      await authService.login({ username, password });
+      await fetchUser(); // Получаем данные пользователя после входа
+      return true;
+    } catch (e) {
+      console.error('Ошибка входа:', e);
+      return false;
+    }
+  };
+
+  const register = async (data: any) => {
+    try {
+      await authService.register(data);
+      // После регистрации можно сразу логинить или просить войти
+      // Для простоты просто вернем true, пусть пользователь войдет
+      return true;
+    } catch (e) {
+      console.error('Ошибка регистрации:', e);
+      throw e;
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    authService.logout();
   };
 
   return (
@@ -63,6 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         user,
         login,
+        register,
         logout,
         isAdmin: user?.role === 'admin',
         isOperator: user?.role === 'operator' || user?.role === 'admin',

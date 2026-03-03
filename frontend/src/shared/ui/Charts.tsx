@@ -1,7 +1,5 @@
-import React from 'react';
-import { motion } from 'framer-motion'; // <-- ВАЖНО: добавить импорт motion!
+import { motion } from 'framer-motion';
 import {
-  AreaChart, Area,
   BarChart, Bar,
   LineChart, Line,
   PieChart, Pie, Cell,
@@ -21,15 +19,17 @@ interface ChartProps {
 }
 
 // Линейный график (тренды)
-export const LineChartComponent: React.FC<ChartProps & { 
+export const LineChartComponent = ({ 
+  title, data, dataKey, xAxisKey, color = '#f97316', className = '' 
+}: ChartProps & { 
   dataKey: string; 
   xAxisKey: string;
   color?: string;
-}> = ({ title, data, dataKey, xAxisKey, color = '#f97316', className = '' }) => {
+}) => {
   return (
     <GlowingCard className={`p-6 ${className}`}>
       {title && <h3 className="text-lg font-bold text-white mb-4">{title}</h3>}
-      <div className="h-64 w-full"> {/* Добавлен w-full */}
+      <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -48,10 +48,12 @@ export const LineChartComponent: React.FC<ChartProps & {
 };
 
 // Столбчатая диаграмма
-export const BarChartComponent: React.FC<ChartProps & { 
+export const BarChartComponent = ({ 
+  title, data, dataKey, xAxisKey, className = '' 
+}: ChartProps & { 
   dataKey: string; 
   xAxisKey: string;
-}> = ({ title, data, dataKey, xAxisKey, className = '' }) => {
+}) => {
   return (
     <GlowingCard className={`p-6 ${className}`}>
       {title && <h3 className="text-lg font-bold text-white mb-4">{title}</h3>}
@@ -74,10 +76,12 @@ export const BarChartComponent: React.FC<ChartProps & {
 };
 
 // Круговая диаграмма
-export const PieChartComponent: React.FC<ChartProps & { 
+export const PieChartComponent = ({ 
+  title, data, nameKey, valueKey, className = '' 
+}: ChartProps & { 
   nameKey: string; 
   valueKey: string;
-}> = ({ title, data, nameKey, valueKey, className = '' }) => {
+}) => {
   return (
     <GlowingCard className={`p-6 ${className}`}>
       {title && <h3 className="text-lg font-bold text-white mb-4">{title}</h3>}
@@ -89,12 +93,12 @@ export const PieChartComponent: React.FC<ChartProps & {
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={(entry) => `${entry[nameKey]}: ${entry[valueKey]}%`}
+              label={(entry: any) => `${entry[nameKey]}: ${entry[valueKey]}%`}
               outerRadius={80}
               fill="#8884d8"
               dataKey={valueKey}
             >
-              {data.map((entry, index) => (
+              {data.map((_entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
@@ -109,9 +113,11 @@ export const PieChartComponent: React.FC<ChartProps & {
 };
 
 // Радарная диаграмма (для сравнения команд)
-export const RadarChartComponent: React.FC<ChartProps & {
+export const RadarChartComponent = ({ 
+  title, data, dataKeys, className = '' 
+}: ChartProps & {
   dataKeys: string[];
-}> = ({ title, data, dataKeys, className = '' }) => {
+}) => {
   return (
     <GlowingCard className={`p-6 ${className}`}>
       {title && <h3 className="text-lg font-bold text-white mb-4">{title}</h3>}
@@ -142,13 +148,13 @@ export const RadarChartComponent: React.FC<ChartProps & {
   );
 };
 
-// Прогресс-бар с анимацией (исправлен)
-export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; label?: string }> = ({ 
+// Прогресс-бар с анимацией
+export const ProgressBar = ({ 
   value, 
   max = 100, 
   color = '#f97316',
   label
-}) => {
+}: { value: number; max?: number; color?: string; label?: string }) => {
   const percentage = (value / max) * 100;
   
   return (

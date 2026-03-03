@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { apiRequest, Team } from '@/shared/api/client';
+import { apiRequest } from '@/shared/api/client';
+import type { Team } from '@/shared/api/client';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
-import { Users, Trophy, MapPin } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 
 export const TeamsPage = () => {
   const [teams, setTeams] = useState<Team[]>([]);

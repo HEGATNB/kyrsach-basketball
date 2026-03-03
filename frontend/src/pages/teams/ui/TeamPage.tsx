@@ -1,24 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { apiRequest, Team } from '@/shared/api/client';
+import { apiRequest } from '@/shared/api/client';
+import type { Team, Player } from '@/shared/api/client';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
-import { ArrowLeft, Trophy, MapPin, Calendar, Users } from 'lucide-react';
+import { PlayerCard } from '@/shared/ui/PlayerCard';
+import { ArrowLeft, Trophy, MapPin, Users } from 'lucide-react';
 
 export const TeamPage = () => {
   const { teamId } = useParams();
   const [team, setTeam] = useState<Team | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadTeam();
+    loadData();
   }, [teamId]);
 
-  const loadTeam = async () => {
+  const loadData = async () => {
     try {
-      const data = await apiRequest<Team>(`/teams/${teamId}`);
-      setTeam(data);
+      const [teamData, playersData] = await Promise.all([
+        apiRequest<Team>(`/teams/${teamId}`),
+        apiRequest<Player[]>(`/players?team_id=${teamId}`)
+      ]);
+      setTeam(teamData);
+      setPlayers(playersData);
     } catch (err) {
       setError('Команда не найдена');
     } finally {
@@ -60,7 +67,7 @@ export const TeamPage = () => {
         Назад к списку
       </Link>
 
-      <GlowingCard glowColor="orange" intensity="high" className="p-8 mb-8">
+      <GlowingCard glowColor="orange" className="p-8 mb-8">
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-4xl font-bold text-white mb-2">{team.name}</h1>
@@ -113,7 +120,24 @@ export const TeamPage = () => {
         </GlowingCard>
       </div>
 
-      <div className="mt-8 flex gap-4">
+      <div className="mt-12">
+        <div className="flex items-center gap-3 mb-6">
+          <Users className="w-6 h-6 text-orange-500" />
+          <h2 className="text-2xl font-bold text-white">Состав команды</h2>
+        </div>
+        
+        {players.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {players.map((player, index) => (
+              <PlayerCard key={player.id} player={player} delay={index * 0.1} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-500 italic">Данные о составе временно отсутствуют</p>
+        )}
+      </div>
+
+      <div className="mt-12 flex gap-4">
         <Link
           to={`/prediction/new?team1=${team.id}`}
           className="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"

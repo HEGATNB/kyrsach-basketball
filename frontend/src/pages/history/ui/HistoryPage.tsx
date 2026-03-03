@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { apiRequest } from '@/shared/api/client';
@@ -118,21 +118,32 @@ export const HistoryPage = () => {
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center text-sm font-bold">
-                            {pred.team1?.abbrev}
-                          </div>
-                          <span className="text-white">{pred.team1?.name}</span>
+                      <div className="flex flex-col sm:flex-row items-center gap-6">
+                        <div className="flex flex-col items-center gap-2">
+                          <img 
+                            src={`https://www.nba.com/assets/logos/teams/primary/web/${pred.team1?.abbrev}.svg`} 
+                            alt={pred.team1?.name}
+                            className="w-12 h-12 object-contain"
+                            onError={(e) => (e.target as HTMLImageElement).src = 'https://www.nba.com/assets/logos/teams/primary/web/NBA.svg'}
+                          />
+                          <span className="text-white text-xs font-bold">{pred.team1?.abbrev}</span>
                         </div>
                         
-                        <span className="text-slate-600">vs</span>
-                        
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-sm font-bold">
-                            {pred.team2?.abbrev}
+                        <div className="flex flex-col items-center">
+                          <span className="text-slate-600 font-bold mb-1">VS</span>
+                          <div className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-400">
+                            {new Date(pred.createdAt).toLocaleDateString()}
                           </div>
-                          <span className="text-white">{pred.team2?.name}</span>
+                        </div>
+                        
+                        <div className="flex flex-col items-center gap-2">
+                          <img 
+                            src={`https://www.nba.com/assets/logos/teams/primary/web/${pred.team2?.abbrev}.svg`} 
+                            alt={pred.team2?.name}
+                            className="w-12 h-12 object-contain"
+                            onError={(e) => (e.target as HTMLImageElement).src = 'https://www.nba.com/assets/logos/teams/primary/web/NBA.svg'}
+                          />
+                          <span className="text-white text-xs font-bold">{pred.team2?.abbrev}</span>
                         </div>
                       </div>
                     </div>
