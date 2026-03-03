@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 import os
 from dotenv import load_dotenv
-from passlib.context import CryptContext
+import bcrypt  # Прямой импорт bcrypt вместо passlib
 
 load_dotenv()
 
@@ -11,16 +11,23 @@ load_dotenv()
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
 JWT_EXPIRES_IN = os.getenv("JWT_EXPIRES_IN", "7d")
 
-# Хеширование паролей
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def get_password_hash(password: str) -> str:
-    """Хеширование пароля"""
-    return pwd_context.hash(password)
+    """Хеширование пароля с помощью bcrypt"""
+    # Преобразуем пароль в байты и хешируем
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Проверка пароля"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Проверка пароля с помощью bcrypt"""
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'),
+            hashed_password.encode('utf-8')
+        )
+    except Exception as e:
+        print(f"Ошибка проверки пароля: {e}")
+        return False
 
 def parse_expires_in(expires_in: str) -> int:
     """Парсинг строки типа '7d' в минуты"""
