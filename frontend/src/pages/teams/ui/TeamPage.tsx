@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { apiRequest } from '@/shared/api/client';
-import type { Team, Player } from '@/shared/api/client';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, CalendarRange, MapPin, Users } from 'lucide-react';
+import { apiRequest, type Player, type Team } from '@/shared/api/client';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
 import { PlayerCard } from '@/shared/ui/PlayerCard';
-import { ArrowLeft, Trophy, MapPin, Users } from 'lucide-react';
+import { TeamMark } from '@/shared/ui/TeamMark';
+import { hexToRgba } from '@/shared/lib/teamBrand';
 
 export const TeamPage = () => {
   const { teamId } = useParams();
@@ -15,137 +15,171 @@ export const TeamPage = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadData();
+    if (!teamId) {
+      setError('Team id is missing.');
+      setLoading(false);
+      return;
+    }
+
+    Promise.all([apiRequest<Team>(`/teams/${teamId}`), apiRequest<Player[]>(`/players?team_id=${teamId}`)])
+      .then(([teamData, playerData]) => {
+        setTeam(teamData);
+        setPlayers(playerData);
+      })
+      .catch(() => setError('Unable to load this team profile right now.'))
+      .finally(() => setLoading(false));
   }, [teamId]);
 
-  const loadData = async () => {
-    try {
-      const [teamData, playersData] = await Promise.all([
-        apiRequest<Team>(`/teams/${teamId}`),
-        apiRequest<Player[]>(`/players?team_id=${teamId}`)
-      ]);
-      setTeam(teamData);
-      setPlayers(playersData);
-    } catch (err) {
-      setError('Команда не найдена');
-    } finally {
-      setLoading(false);
+  const winRate = useMemo(() => {
+    if (!team) {
+      return 0;
     }
-  };
+
+    const totalGames = team.wins + team.losses;
+    return totalGames > 0 ? (team.wins / totalGames) * 100 : 0;
+  }, [team]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
       </div>
     );
   }
 
-  if (error || !team) {
+  if (!team || error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-400">{error}</p>
-        <Link to="/teams" className="text-orange-400 hover:text-orange-300 mt-4 inline-block">
-          ← Назад к командам
+      <div className="space-y-6">
+        <Link to="/teams" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition hover:text-white">
+          <ArrowLeft className="h-4 w-4" />
+          Back to teams
         </Link>
+        <p className="rounded-xl border border-rose-400/20 bg-rose-500/10 p-6 text-rose-100">{error || 'Team not found.'}</p>
       </div>
     );
   }
 
-  const winPercentage = team.wins + team.losses > 0 
-    ? ((team.wins / (team.wins + team.losses)) * 100).toFixed(1)
-    : '0';
+  const differential = team.avgPointsFor - team.avgPointsAgainst;
+  const tint = hexToRgba(team.brandColor || '#c96a2b', 0.16);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="max-w-4xl mx-auto"
-    >
-      <Link to="/teams" className="text-orange-400 hover:text-orange-300 inline-flex items-center gap-2 mb-6">
-        <ArrowLeft className="w-4 h-4" />
-        Назад к списку
+    <div className="space-y-8">
+      <Link to="/teams" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition hover:text-white">
+        <ArrowLeft className="h-4 w-4" />
+        Back to team index
       </Link>
 
-      <GlowingCard glowColor="orange" className="p-8 mb-8">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2">{team.name}</h1>
-            <p className="text-slate-400">{team.city}</p>
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_380px]">
+        <GlowingCard glowColor="orange" className="p-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="data-chip">{team.conference?.shortName || team.conference?.name || 'League'}</span>
+            <span className="data-chip">{team.division?.name || 'Division'}</span>
           </div>
-          <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center text-3xl font-bold">
-            {team.abbrev}
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div>
-            <p className="text-sm text-slate-400 mb-1">Победы</p>
-            <p className="text-3xl font-bold text-green-400">{team.wins}</p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-400 mb-1">Поражения</p>
-            <p className="text-3xl font-bold text-red-400">{team.losses}</p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-400 mb-1">% побед</p>
-            <p className="text-3xl font-bold text-orange-400">{winPercentage}%</p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-400 mb-1">Чемпионства</p>
-            <p className="text-3xl font-bold text-yellow-400">{team.championships || 0}</p>
-          </div>
-        </div>
-      </GlowingCard>
+          <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Team profile</p>
+              <h1 className="mt-3 font-spacegrotesk text-4xl font-bold text-white sm:text-5xl">{team.name}</h1>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">
+                Current form, scoring profile and roster rotation for {team.city || team.name}.
+              </p>
+            </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <GlowingCard glowColor="blue" className="p-6">
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-blue-400" />
-            Арена
-          </h3>
-          <p className="text-2xl font-bold text-white mb-2">{team.arena || 'Не указано'}</p>
-          <p className="text-slate-400">Основана в {team.foundedYear || 'Не указано'}</p>
+            <TeamMark team={team} size="lg" />
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-4">
+            <div className="metric-panel">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Record</p>
+              <p className="mt-3 text-3xl font-semibold text-white">
+                {team.wins}-{team.losses}
+              </p>
+            </div>
+            <div className="metric-panel">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Win rate</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{winRate.toFixed(1)}%</p>
+            </div>
+            <div className="metric-panel">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Offense</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{team.avgPointsFor.toFixed(1)}</p>
+            </div>
+            <div className="metric-panel">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Defense</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{team.avgPointsAgainst.toFixed(1)}</p>
+            </div>
+          </div>
+
+          <div className="surface-muted mt-6" style={{ borderColor: tint }}>
+            <div className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-slate-400">Net rating proxy</span>
+              <span className={`font-semibold ${differential >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {differential >= 0 ? '+' : ''}
+                {differential.toFixed(1)}
+              </span>
+            </div>
+          </div>
         </GlowingCard>
 
-        <GlowingCard glowColor="purple" className="p-6">
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-yellow-400" />
-            Статистика
-          </h3>
-          <div className="space-y-2">
-            <p>Средние очки: <span className="text-orange-400 font-bold">{team.pointsPerGame?.toFixed(1) || '0'}</span></p>
-            <p>Пропущено: <span className="text-blue-400 font-bold">{team.pointsAgainst?.toFixed(1) || '0'}</span></p>
-          </div>
-        </GlowingCard>
-      </div>
+        <div className="grid gap-6">
+          <GlowingCard glowColor="blue" className="p-6">
+            <div className="flex items-center gap-3">
+              <MapPin className="h-5 w-5 text-[#d6e1eb]" />
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-[rgba(214,225,235,0.72)]">Home floor</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">{team.arena || 'Arena not available'}</h2>
+              </div>
+            </div>
+            <p className="mt-4 text-slate-300">
+              {team.city || 'Unknown city'} / founded {team.foundedYear || 'n/a'}
+            </p>
+          </GlowingCard>
 
-      <div className="mt-12">
-        <div className="flex items-center gap-3 mb-6">
-          <Users className="w-6 h-6 text-orange-500" />
-          <h2 className="text-2xl font-bold text-white">Состав команды</h2>
+          <GlowingCard glowColor="green" className="p-6">
+            <div className="flex items-center gap-3">
+              <CalendarRange className="h-5 w-5 text-[#d5e0d2]" />
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-[rgba(213,224,210,0.72)]">Season snapshot</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">Rotation and balance</h2>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div className="surface-muted">
+                <p className="text-slate-500">Roster loaded</p>
+                <p className="mt-2 text-lg font-semibold text-white">{players.length} players</p>
+              </div>
+              <div className="surface-muted">
+                <p className="text-slate-500">Conference</p>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  {team.conference?.shortName || team.conference?.name || 'League'}
+                </p>
+              </div>
+            </div>
+          </GlowingCard>
         </div>
-        
+      </section>
+
+      <section className="space-y-5">
+        <div className="flex items-center gap-3">
+          <Users className="h-6 w-6 text-[#ecd8ab]" />
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Roster</p>
+            <h2 className="text-2xl font-semibold text-white">Core rotation</h2>
+          </div>
+        </div>
+
         {players.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {players.map((player, index) => (
-              <PlayerCard key={player.id} player={player} delay={index * 0.1} />
+              <PlayerCard key={player.id} player={player} delay={index * 0.04} />
             ))}
           </div>
         ) : (
-          <p className="text-slate-500 italic">Данные о составе временно отсутствуют</p>
+          <GlowingCard glowColor="purple" className="p-8 text-center">
+            <p className="text-white">Player data for this team is not available yet.</p>
+          </GlowingCard>
         )}
-      </div>
-
-      <div className="mt-12 flex gap-4">
-        <Link
-          to={`/prediction/new?team1=${team.id}`}
-          className="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"
-        >
-          Сделать прогноз с этой командой
-        </Link>
-      </div>
-    </motion.div>
+      </section>
+    </div>
   );
 };
 

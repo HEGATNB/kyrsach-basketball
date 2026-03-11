@@ -1,16 +1,17 @@
-﻿FROM python:3.11-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Устанавливаем системные зависимости для psycopg2
-RUN apk add --no-cache postgresql-dev gcc python3-dev musl-dev
+RUN apk add --no-cache openssl
 
-# Копируем зависимости
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Копируем остальной код
+COPY prisma ./prisma
+RUN npx prisma generate
+
 COPY . .
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8000
+
+CMD ["sh", "-c", "npm run prisma:generate && npm run db:migrate && npm run dev"]

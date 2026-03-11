@@ -1,4 +1,3 @@
-import { prisma } from '../index';
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.service';
 
@@ -7,14 +6,14 @@ const authService = new AuthService();
 export class AuthController {
   async register(req: Request, res: Response) {
     try {
-      const { email, password, name, role } = req.body;
+      const { email, password, name, username, role } = req.body;
+      const displayName = name || username;
 
-      if (!email || !password || !name) {
-        return res.status(400).json({ error: 'Email, пароль и имя обязательны' });
+      if (!email || !password || !displayName) {
+        return res.status(400).json({ error: 'Email, password and name are required' });
       }
 
-      const result = await authService.register(email, password, name, role);
-      res.json(result);
+      res.json(await authService.register(email, password, displayName, role));
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
@@ -22,14 +21,14 @@ export class AuthController {
 
   async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
+      const { email, username, identifier, password } = req.body;
+      const loginValue = identifier || email || username;
 
-      if (!email || !password) {
-        return res.status(400).json({ error: 'Email и пароль обязательны' });
+      if (!loginValue || !password) {
+        return res.status(400).json({ error: 'Login and password are required' });
       }
 
-      const result = await authService.login(email, password);
-      res.json(result);
+      res.json(await authService.login(loginValue, password));
     } catch (error: any) {
       res.status(401).json({ error: error.message });
     }
@@ -38,20 +37,20 @@ export class AuthController {
   async getMe(req: Request, res: Response) {
     try {
       if (!req.user) {
-        return res.status(401).json({ error: 'Не авторизован' });
+        return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      res.json({ user: req.user });
+      res.json(await authService.getMe(req.user.userId));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 
-  async initDatabase(req: Request, res: Response) {
+  async initDatabase(_req: Request, res: Response) {
     try {
       await authService.initRoles();
       await authService.initTestUsers();
-      res.json({ message: 'База данных инициализирована' });
+      res.json({ message: 'Database initialized' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

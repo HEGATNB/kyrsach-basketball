@@ -157,6 +157,8 @@ model Player {
   photoUrl        String?
   
   playerStats     PlayerStats[]
+  allStarSelections AllStarSelection[]
+  draftPicks      DraftPick[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

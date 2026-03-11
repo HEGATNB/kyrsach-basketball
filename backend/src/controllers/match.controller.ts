@@ -7,6 +7,7 @@ export class MatchController {
   async getAll(req: Request, res: Response) {
     try {
       const filters: any = {};
+      let limit: number | undefined;
       
       if (req.query.status) {
         filters.status = req.query.status;
@@ -18,8 +19,11 @@ export class MatchController {
           { awayTeamId: teamId }
         ];
       }
+      if (req.query.limit) {
+        limit = parseInt(req.query.limit as string, 10);
+      }
 
-      const matches = await matchService.getAllMatches(filters);
+      const matches = await matchService.getAllMatches(filters, limit);
       res.json(matches);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

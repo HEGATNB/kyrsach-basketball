@@ -1,28 +1,31 @@
-﻿version: '3.8'
-
 services:
   frontend:
-    build: ./frontend  # строим из директории frontend
+    build: ./frontend
+    environment:
+      - VITE_PROXY_TARGET=http://backend:8000
     ports:
       - "5173:5173"
-    environment:
-      - VITE_API_URL=http://backend:8000
     depends_on:
       - backend
     volumes:
-      - ./frontend:/app  # для hot reload в development
+      - ./frontend:/app
       - /app/node_modules
+    command: ["sh", "-c", "npm run dev -- --host 0.0.0.0"]
 
   backend:
-    build: ./backend    # строим из директории backend
+    build: ./backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql://user:password@db/hoopstat_db
+      - DATABASE_URL=postgresql://user:password@db:5432/hoopstat_db?schema=public
+      - PORT=8000
+      - JWT_SECRET=dev-secret-change-me
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
-      - ./backend:/app  # для hot reload
+      - ./backend:/app
+      - /app/node_modules
 
   db:
     image: postgres:15
@@ -30,8 +33,15 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: hoopstat_db
+    ports:
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d hoopstat_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   postgres_data:

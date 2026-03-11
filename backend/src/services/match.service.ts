@@ -5,14 +5,15 @@ export class MatchService {
   private audit = new AuditService();
 
   // Получить все матчи
-  async getAllMatches(filters?: any) {
+  async getAllMatches(filters?: any, limit?: number) {
     return prisma.match.findMany({
       where: filters,
       include: {
         homeTeam: true,
         awayTeam: true
       },
-      orderBy: { date: 'desc' }
+      orderBy: { date: 'desc' },
+      ...(limit ? { take: limit } : {})
     });
   }
 
