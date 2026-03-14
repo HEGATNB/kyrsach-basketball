@@ -1,7 +1,0 @@
-node_modules
-dist
-backups
-backend_log.txt
-.env
-.git
-npm-debug.log

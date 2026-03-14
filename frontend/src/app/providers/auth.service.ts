@@ -1,46 +1,71 @@
-import { requestJson, type AuthUser } from '@/shared/api/client';
+// Адрес твоего бэкенда
+const API_URL = 'http://localhost:8000/api/auth';
 
-const TOKEN_KEY = 'token';
+export interface User {
+  id: number;
+  email: string;
+  username: string;
+  role: string;
+}
 
-export interface AuthResult {
-  token: string;
-  user: AuthUser;
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
 }
 
 export const authService = {
-  async register(userData: { email: string; password: string; name?: string; username?: string }) {
-    const result = await requestJson<AuthResult>('/auth/register', {
+  // Регистрация
+  async register(userData: any) {
+    const response = await fetch(`${API_URL}/register`, {
       method: 'POST',
-      body: JSON.stringify({
-        email: userData.email,
-        password: userData.password,
-        name: userData.name || userData.username,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
     });
 
-    localStorage.setItem(TOKEN_KEY, result.token);
-    return result;
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Ошибка регистрации');
+    }
+    return response.json();
   },
 
-  async login(credentials: { identifier: string; password: string }) {
-    const result = await requestJson<AuthResult>('/auth/login', {
+  // Вход (Login)
+  async login(credentials: { username: string; password: string }) {
+    // FastAPI ожидает данные формы (OAuth2PasswordRequestForm), а не JSON
+    const formData = new URLSearchParams();
+    formData.append('username', credentials.username);
+    formData.append('password', credentials.password);
+
+    const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
-      body: JSON.stringify(credentials),
+      headers: { 
+        'Content-Type': 'application/x-www-form-urlencoded' 
+      },
+      body: formData
     });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Ошибка входа');
+    }
 
-    localStorage.setItem(TOKEN_KEY, result.token);
-    return result;
+    const data: AuthResponse = await response.json();
+    // Сохраняем токен в LocalStorage
+    localStorage.setItem('token', data.access_token);
+    return data;
   },
 
+  // Выход
   logout() {
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('token');
   },
 
+  // Получение токена (для добавления в заголовки других запросов)
   getToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem('token');
   },
 
   isAuthenticated() {
-    return Boolean(localStorage.getItem(TOKEN_KEY));
-  },
+    return !!localStorage.getItem('token');
+  }
 };

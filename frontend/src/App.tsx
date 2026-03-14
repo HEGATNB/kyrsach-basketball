@@ -1,11 +1,11 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './app/Layout';
-import { ProtectedRoute } from './app/ProtectedRoute';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { HomePage } from './pages/home/ui/HomePage';
 import { LoadingSpinner } from './shared/ui/LoadingSpinner';
 
+// Ленивая загрузка страниц (будут загружаться только при переходе)
 const TeamsPage = lazy(() => import('./pages/teams/ui/TeamsPage'));
 const TeamPage = lazy(() => import('./pages/teams/ui/TeamPage'));
 const MatchesPage = lazy(() => import('./pages/matches/ui/MatchesPage'));
@@ -32,39 +32,11 @@ function App() {
               <Route path="/players" element={<PlayersPage />} />
               <Route path="/matches" element={<MatchesPage />} />
               <Route path="/matches/:matchId" element={<MatchPage />} />
-              <Route
-                path="/prediction/new"
-                element={
-                  <ProtectedRoute>
-                    <PredictionNewPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/prediction/:id"
-                element={
-                  <ProtectedRoute>
-                    <PredictionResultPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/history"
-                element={
-                  <ProtectedRoute>
-                    <HistoryPage />
-                  </ProtectedRoute>
-                }
-              />
+...
+              <Route path="/prediction/:id" element={<PredictionResultPage />} />
+              <Route path="/history" element={<HistoryPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute roles={['admin']}>
-                    <AdminPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>

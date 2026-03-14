@@ -1,31 +1,28 @@
+﻿version: '3.8'
+
 services:
   frontend:
-    build: ./frontend
-    environment:
-      - VITE_PROXY_TARGET=http://backend:8000
+    build: ./frontend  # строим из директории frontend
     ports:
       - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:8000
     depends_on:
       - backend
     volumes:
-      - ./frontend:/app
+      - ./frontend:/app  # для hot reload в development
       - /app/node_modules
-    command: ["sh", "-c", "npm run dev -- --host 0.0.0.0"]
 
   backend:
-    build: ./backend
+    build: ./backend    # строим из директории backend
     ports:
-      - "8001:8000"
+      - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/hoopstat_db?schema=public
-      - PORT=8000
-      - JWT_SECRET=dev-secret-change-me
+      - DATABASE_URL=postgresql://user:password@db/hoopstat_db
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - ./backend:/app  # для hot reload
 
   db:
     image: postgres:15
@@ -33,15 +30,11 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: hoopstat_db
-    ports:
-      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d hoopstat_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
+      - ./backend/postgres/init:/docker-entrypoint-initdb.d  # добавляем эту строку
+    ports:
+      - "5432:5432"  # опционально: открыть порт для внешнего доступа
 
 volumes:
   postgres_data:

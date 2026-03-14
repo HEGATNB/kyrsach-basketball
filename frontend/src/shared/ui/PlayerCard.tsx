@@ -1,7 +1,6 @@
-import { ArrowUpRight } from 'lucide-react';
-import { GlowingCard } from './GlowingCard';
-import { TeamMark } from './TeamMark';
-import { getTeamBrand, hexToRgba } from '@/shared/lib/teamBrand';
+import { motion } from "framer-motion";
+import { User, Target, BarChart3, Info } from "lucide-react";
+import { GlowingCard } from "./GlowingCard";
 
 interface PlayerCardProps {
   player: {
@@ -12,122 +11,77 @@ interface PlayerCardProps {
     position?: string;
     height?: string;
     weight?: number;
-    minutes_per_game?: number;
     points_per_game: number;
     rebounds_per_game: number;
     assists_per_game: number;
     image_url?: string;
-    team?: {
-      name: string;
-      abbrev?: string;
-      logoUrl?: string;
-      brandColor?: string;
-      accentColor?: string;
-    };
   };
-  summary: string;
   delay?: number;
-  onOpenDetails?: () => void;
 }
 
-export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: PlayerCardProps) {
-  const teamBrand = getTeamBrand({ abbrev: player.team?.abbrev, name: player.team?.name });
-  const brandColor = player.team?.brandColor || teamBrand.brandColor;
-  const accentColor = player.team?.accentColor || teamBrand.accentColor;
-  const fallbackImage = player.team?.logoUrl || teamBrand.logoUrl;
-  const heroStyle = {
-    background: `linear-gradient(145deg, ${hexToRgba(brandColor, 0.22)}, ${hexToRgba(accentColor, 0.08)} 64%, rgba(7,9,12,0.92) 100%)`,
-    borderColor: hexToRgba(brandColor, 0.26),
-  };
+export function PlayerCard({ player, delay = 0 }: PlayerCardProps) {
+  const defaultImage = "https://www.nba.com/assets/logos/teams/primary/web/NBA.svg";
 
   return (
-    <GlowingCard
-      glowColor="blue"
-      delay={delay}
-      className={`h-full overflow-hidden p-0 ${onOpenDetails ? 'cursor-pointer' : ''}`}
-      onClick={onOpenDetails}
-    >
-      <div className="border-b border-white/6 p-5" style={heroStyle}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">
-              {player.position || 'Player'} / #{player.number || '--'}
-            </p>
-            <h3 className="mt-3 text-2xl font-semibold text-white">
-              {player.first_name} {player.last_name}
-            </h3>
-            <p className="mt-1 text-sm text-slate-200">{player.team?.name || 'NBA roster'}</p>
-          </div>
-          <TeamMark team={player.team} size="sm" />
-        </div>
-
-        <div className="mt-5 flex items-end gap-4">
-          <div className="h-28 w-24 shrink-0 overflow-hidden rounded-[14px] border border-white/10 bg-black/20">
-            <img
-              src={player.image_url || fallbackImage}
-              alt={`${player.first_name} ${player.last_name}`}
-              className="h-full w-full object-cover object-top"
-              loading="lazy"
-              decoding="async"
-              onError={(event) => {
-                (event.target as HTMLImageElement).src = fallbackImage;
-              }}
-            />
-          </div>
-
-          <div className="min-h-[84px] flex-1">
-            <p className="text-sm leading-6 text-slate-100">{summary}</p>
+    <GlowingCard glowColor="blue" delay={delay} className="group h-full">
+      <div className="relative mb-6 -mx-6 -mt-6 h-48 overflow-hidden rounded-t-2xl">
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent z-10" />
+        <img
+          src={player.image_url || defaultImage}
+          alt={`${player.first_name} ${player.last_name}`}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = defaultImage;
+          }}
+        />
+        <div className="absolute bottom-4 left-6 z-20">
+          <div className="flex items-center gap-2">
+            <span className="text-4xl font-black text-white leading-none">
+              #{player.number || "00"}
+            </span>
+            <div className="h-8 w-1 bg-orange-500 rounded-full" />
+            <div>
+              <p className="text-xs font-bold text-orange-500 uppercase tracking-widest">
+                {player.position || "Player"}
+              </p>
+              <h3 className="text-xl font-bold text-white leading-none">
+                {player.first_name[0]}. {player.last_name}
+              </h3>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="p-5">
-        <div className="stat-grid grid-cols-3">
-          <div className="stat-grid-cell">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">PTS</p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums text-white">{player.points_per_game.toFixed(1)}</p>
-          </div>
-          <div className="stat-grid-cell">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">REB</p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums text-white">{player.rebounds_per_game.toFixed(1)}</p>
-          </div>
-          <div className="stat-grid-cell">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">AST</p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums text-white">{player.assists_per_game.toFixed(1)}</p>
-          </div>
+      <div className="grid grid-cols-3 gap-2 mb-6">
+        <div className="text-center p-2 rounded-xl bg-slate-800/50">
+          <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">PTS</p>
+          <p className="text-lg font-black text-white">{player.points_per_game.toFixed(1)}</p>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div className="flex min-h-[30px] items-center justify-between gap-3 border-b border-white/6 pb-2 text-slate-300">
-            <span className="text-slate-500">Height</span>
-            <span className="font-medium text-white">{player.height || 'N/A'}</span>
-          </div>
-          <div className="flex min-h-[30px] items-center justify-between gap-3 border-b border-white/6 pb-2 text-slate-300">
-            <span className="text-slate-500">Weight</span>
-            <span className="font-medium text-white">{player.weight ? `${player.weight} kg` : 'N/A'}</span>
-          </div>
-          <div className="flex min-h-[30px] items-center justify-between gap-3 text-slate-300">
-            <span className="text-slate-500">Minutes</span>
-            <span className="font-medium tabular-nums text-white">{player.minutes_per_game?.toFixed(1) || 'N/A'}</span>
-          </div>
-          <div className="flex min-h-[30px] items-center justify-between gap-3 text-slate-300">
-            <span className="text-slate-500">Role</span>
-            <span className="font-medium text-white">{player.position || 'Rotation'}</span>
-          </div>
+        <div className="text-center p-2 rounded-xl bg-slate-800/50">
+          <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">REB</p>
+          <p className="text-lg font-black text-white">{player.rebounds_per_game.toFixed(1)}</p>
         </div>
+        <div className="text-center p-2 rounded-xl bg-slate-800/50">
+          <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">AST</p>
+          <p className="text-lg font-black text-white">{player.assists_per_game.toFixed(1)}</p>
+        </div>
+      </div>
 
-        {onOpenDetails && (
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenDetails();
-            }}
-            className="btn-secondary mt-5 w-full justify-between"
-          >
-            Open scout report
-            <ArrowUpRight className="h-4 w-4" />
-          </button>
-        )}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Info className="w-4 h-4" />
+            <span>Рост/Вес</span>
+          </div>
+          <span className="text-white font-medium">
+            {player.height || "N/A"} / {player.weight ? `${player.weight} кг` : "N/A"}
+          </span>
+        </div>
+        <div className="w-full h-px bg-slate-800" />
+        <button className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-sm font-bold flex items-center justify-center gap-2">
+          <BarChart3 className="w-4 h-4" />
+          Полная статистика
+        </button>
       </div>
     </GlowingCard>
   );

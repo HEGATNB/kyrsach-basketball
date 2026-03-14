@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
@@ -6,29 +6,20 @@ import pandas as pd
 import pickle
 import os
 import asyncio
-try:
-    from tensorflow.keras.models import load_model
-    TF_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
-    print("TensorFlow not found. AI predictions will be disabled.")
-    TF_AVAILABLE = False
-import sqlite3
+from tensorflow.keras.models import load_model
 from datetime import datetime
-from typing import List, Optional
-import json
-import traceback
-from fastapi.responses import JSONResponse
+from typing import Optional
 
 # Импортируем контроллеры из папки controllers
-from controllers import auth, teams, matches, predictions, players
+from controllers import auth, teams, matches, predictions
 
 # Импортируем функции из скриптов
 from scripts.update_data import update_db_with_new_games
 from scripts.train_model import train_model
 
-# Импортируем database и модели
-from database import engine, Base
-import models
+# Импортируем database
+from database import engine, Base, get_db
+from sqlalchemy.orm import Session
 
 app = FastAPI(
     title="HoopsAI API",
@@ -36,24 +27,20 @@ app = FastAPI(
     version="1.0.0"
 )
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    with open("error_traceback.txt", "w") as f:
-        f.write(traceback.format_exc())
-    return JSONResponse(status_code=500, content={"message": "Internal Server Error"})
-
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:5173",  # Vite порт
+        "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:8000",
     ],
     allow_credentials=True,
-    allow_methods=["*"],  # Разрешаем все методы (GET, POST, OPTIONS и т.д.)
-    allow_headers=["*"],  # Разрешаем все заголовки
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 # ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ НЕЙРОСЕТИ ==========
 model = None
 scaler = None
@@ -61,7 +48,6 @@ team_emas = {}
 teams_df = None
 STATS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'pf', 'fg_pct', 'fg3_pct', 'ft_pct']
 MODEL_DIR = "./models"
-DB_PATH = "./nba.sqlite"
 
 
 # ========== МОДЕЛИ ДЛЯ НЕЙРОСЕТИ ==========
@@ -78,14 +64,7 @@ class NeuralPredictionResponse(BaseModel):
 
 # ========== ЗАГРУЗКА НЕЙРОСЕТИ ПРИ СТАРТЕ ==========
 @app.on_event("startup")
-def startup_event():
-    # Создаем таблицы в БД при запуске
-    try:
-        Base.metadata.create_all(bind=engine)
-        print("✅ Таблицы в базе данных созданы успешно")
-    except Exception as e:
-        print(f"❌ Ошибка создания таблиц в БД: {e}")
-
+def load_artifacts():
     global model, scaler, team_emas, teams_df
     model_path = os.path.join(MODEL_DIR, "model.h5")
     scaler_path = os.path.join(MODEL_DIR, "scaler.pkl")
@@ -110,6 +89,7 @@ def startup_event():
 
 # ========== ЭНДПОИНТЫ ДЛЯ НЕЙРОСЕТИ ==========
 @app.get("/api/neural/teams")
+@app.get("/neural/teams")
 def get_neural_teams():
     """Список команд для нейросети"""
     if teams_df is None:
@@ -117,7 +97,8 @@ def get_neural_teams():
     return teams_df[['team_abbrev', 'team_name']].drop_duplicates().to_dict(orient='records')
 
 
-@app.post("/api/neural/predict", response_model=NeuralPredictionResponse)
+@app.post("/api/neural/predict")
+@app.post("/neural/predict")
 def neural_predict(request: NeuralPredictionRequest):
     """Предсказание от нейросети"""
     if model is None or scaler is None or teams_df is None:
@@ -156,6 +137,7 @@ def neural_predict(request: NeuralPredictionRequest):
 
 
 @app.post("/api/neural/retrain")
+@app.post("/neural/retrain")
 async def neural_retrain(background_tasks: BackgroundTasks):
     """Переобучение нейросети в фоне"""
     background_tasks.add_task(retrain_task)
@@ -167,9 +149,9 @@ async def retrain_task():
     try:
         loop = asyncio.get_event_loop()
         print("🔄 Начало обновления данных...")
-        await loop.run_in_executor(None, update_db_with_new_games, DB_PATH, 7)
+        await loop.run_in_executor(None, update_db_with_new_games, None, 7)
         print("✅ Данные обновлены. Начало обучения модели...")
-        await loop.run_in_executor(None, train_model, DB_PATH)
+        await loop.run_in_executor(None, train_model, None)
         print("✅ Модель обучена. Перезагрузка артефактов...")
         load_artifacts()
         print("✅ Переобучение завершено успешно")
@@ -179,26 +161,95 @@ async def retrain_task():
 
 # ========== HEALTH CHECK ==========
 @app.get("/api/health")
+@app.get("/health")
 async def health_check():
+    """Проверка работоспособности API"""
+    # Проверяем подключение к PostgreSQL
+    db_status = "unknown"
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+        db.execute("SELECT 1").scalar()
+        db.close()
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+
     return {
         "status": "OK",
         "timestamp": datetime.now().isoformat(),
         "neural_loaded": model is not None,
+        "database": db_status,
         "service": "HoopsAI API"
     }
+
+
+# ========== ПРОВЕРКА БАЗЫ ДАННЫХ ==========
+@app.get("/api/debug/db-check")
+@app.get("/debug/db-check")
+async def check_database():
+    """Проверка подключения к PostgreSQL"""
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+
+        # Проверяем наличие таблиц
+        tables = db.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """).fetchall()
+
+        table_list = [t[0] for t in tables]
+
+        # Проверяем наличие данных в game
+        game_count = 0
+        sample_games = []
+
+        if 'game' in table_list:
+            game_count = db.execute("SELECT COUNT(*) as count FROM game").scalar()
+
+            # Покажем несколько первых записей для отладки
+            games = db.execute("""
+                SELECT game_id, team_name_home, team_name_away, game_date 
+                FROM game 
+                LIMIT 3
+            """).fetchall()
+
+            for row in games:
+                sample_games.append({
+                    "game_id": row[0],
+                    "home": row[1],
+                    "away": row[2],
+                    "date": str(row[3]) if row[3] else None
+                })
+
+        db.close()
+
+        return {
+            "database": "PostgreSQL",
+            "connected": True,
+            "tables": table_list,
+            "games_count": game_count,
+            "sample_games": sample_games
+        }
+    except Exception as e:
+        return {
+            "database": "PostgreSQL",
+            "connected": False,
+            "error": str(e)
+        }
 
 
 # ========== ПОДКЛЮЧАЕМ КОНТРОЛЛЕРЫ ==========
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
-app.include_router(players.router, prefix="/api/players", tags=["players"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(predictions.router, prefix="/api", tags=["predictions"])
 
-# Для обратной совместимости (без /api)
+# Дублируем роуты без /api для обратной совместимости
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/teams", tags=["teams"])
-app.include_router(players.router, prefix="/players", tags=["players"])
 app.include_router(matches.router, prefix="/matches", tags=["matches"])
 app.include_router(predictions.router, prefix="", tags=["predictions"])
 
@@ -209,34 +260,36 @@ async def root():
     return {
         "message": "HoopsAI API работает!",
         "version": "1.0.0",
+        "database": "PostgreSQL",
         "neural_loaded": model is not None,
         "endpoints": {
-            "health": "/api/health",
+            "health": "/api/health or /health",
+            "debug": "/api/debug/db-check or /debug/db-check",
             "neural": {
-                "teams": "/api/neural/teams",
-                "predict": "POST /api/neural/predict",
-                "retrain": "POST /api/neural/retrain"
+                "teams": "/api/neural/teams or /neural/teams",
+                "predict": "POST /api/neural/predict or /neural/predict",
+                "retrain": "POST /api/neural/retrain or /neural/retrain"
             },
             "auth": {
-                "register": "POST /api/auth/register",
-                "login": "POST /api/auth/login",
-                "me": "GET /api/auth/me",
-                "init": "POST /api/auth/init"
+                "register": "POST /api/auth/register or /auth/register",
+                "login": "POST /api/auth/login or /auth/login",
+                "me": "GET /api/auth/me or /auth/me",
+                "init": "POST /api/auth/init or /auth/init"
             },
             "teams": {
-                "all": "GET /api/teams",
-                "by_id": "GET /api/teams/{id}"
+                "all": "GET /api/teams or /teams",
+                "by_id": "GET /api/teams/{id} or /teams/{id}"
             },
             "matches": {
-                "all": "GET /api/matches",
-                "by_id": "GET /api/matches/{id}"
+                "all": "GET /api/matches or /matches",
+                "by_id": "GET /api/matches/{id} or /matches/{id}"
             },
             "predictions": {
-                "predict": "POST /api/predict",
-                "my": "GET /api/predictions/my",
-                "by_id": "GET /api/predictions/{id}",
-                "evaluate": "GET /api/predict/evaluate",
-                "stats": "GET /api/predict/stats"
+                "predict": "POST /api/predict or /predict",
+                "my": "GET /api/predictions/my or /predictions/my",
+                "by_id": "GET /api/predictions/{id} or /predictions/{id}",
+                "evaluate": "GET /api/predict/evaluate or /predict/evaluate",
+                "stats": "GET /api/predict/stats or /predict/stats"
             }
         },
         "docs": "/docs"
@@ -248,7 +301,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8000,
-        reload=False
+        reload=True
     )

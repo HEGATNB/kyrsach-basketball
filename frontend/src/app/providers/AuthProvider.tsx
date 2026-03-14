@@ -1,11 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { apiRequest, type AuthUser } from '@/shared/api/client';
-import { authService } from './auth.service';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { authService, type User } from './auth.service';
 
 interface AuthContextType {
-  user: AuthUser | null;
-  login: (identifier: string, password: string) => Promise<boolean>;
-  register: (data: { email: string; password: string; name?: string; username?: string }) => Promise<boolean>;
+  user: User | null;
+  login: (username: string, password: string) => Promise<boolean>;
+  register: (data: any) => Promise<boolean>;
   logout: () => void;
   isAdmin: boolean;
   isOperator: boolean;
@@ -15,40 +14,66 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authService.isAuthenticated()) {
+    // Проверяем, есть ли сохраненный пользователь
+    const token = localStorage.getItem('token');
+    
+    if (token) {
+      // Если есть токен, пробуем получить данные пользователя
+      fetchUser();
+    } else {
       setLoading(false);
-      return;
     }
-
-    apiRequest<AuthUser>('/auth/me', undefined, false)
-      .then((profile) => setUser(profile))
-      .catch(() => authService.logout())
-      .finally(() => setLoading(false));
   }, []);
 
-  const login = async (identifier: string, password: string) => {
+  const fetchUser = async () => {
     try {
-      const result = await authService.login({ identifier, password });
-      setUser(result.user);
+      const token = authService.getToken();
+      if (!token) throw new Error('No token');
+
+      const response = await fetch('http://localhost:8000/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      } else {
+        logout();
+      }
+    } catch (e) {
+      console.error('Ошибка получения пользователя:', e);
+      logout();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (username: string, password: string) => {
+    try {
+      await authService.login({ username, password });
+      await fetchUser(); // Получаем данные пользователя после входа
       return true;
-    } catch (error) {
-      console.error('Login failed', error);
+    } catch (e) {
+      console.error('Ошибка входа:', e);
       return false;
     }
   };
 
-  const register = async (data: { email: string; password: string; name?: string; username?: string }) => {
+  const register = async (data: any) => {
     try {
-      const result = await authService.register(data);
-      setUser(result.user);
+      await authService.register(data);
+      // После регистрации можно сразу логинить или просить войти
+      // Для простоты просто вернем true, пусть пользователь войдет
       return true;
-    } catch (error) {
-      console.error('Register failed', error);
-      throw error;
+    } catch (e) {
+      console.error('Ошибка регистрации:', e);
+      throw e;
     }
   };
 
@@ -77,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used inside AuthProvider');
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 };

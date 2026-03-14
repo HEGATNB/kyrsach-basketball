@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 import json
 
 from database import get_db
-from services import ai_service, team_service, audit_service, match_service  # добавлен match_service
-from controllers.auth import get_current_user
+from services import ai_service, team_service, audit_service, match_service
+from middleware.auth import get_current_user, require_admin
 import schemas
 
 router = APIRouter()
@@ -14,10 +14,17 @@ router = APIRouter()
 @router.post("/predict", response_model=schemas.PredictionResponse)
 async def predict(
         prediction_data: schemas.PredictionRequest,
-        current_user = Depends(get_current_user),
+        request: Request,
         db: Session = Depends(get_db)
 ):
     """Создание прогноза на матч"""
+    # Проверка авторизации
+    user_data = await get_current_user(request)
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Не авторизован"
+        )
 
     ai_svc = ai_service.AIService(db)
     team_svc = team_service.TeamService(db)
@@ -44,30 +51,28 @@ async def predict(
         prediction = await ai_svc.predict_match(
             prediction_data.team1_id,
             prediction_data.team2_id,
-            current_user.id
+            user_data.user_id
         )
     except Exception as e:
-        print(f"⚠️ AI prediction error: {e}")
-        # Используем демо-данные при ошибке
-        prediction = {
-            "probabilityTeam1": 55.5,
-            "probabilityTeam2": 44.5,
-            "expectedScoreTeam1": 112,
-            "expectedScoreTeam2": 108,
-            "confidence": 75,
-            "modelVersion": "demo-v1"
-        }
+        print(f"❌ AI prediction error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при создании прогноза: {str(e)}"
+        )
 
     # Логирование
     audit_svc.log(
-        user_id=current_user.id,
+        user_id=user_data.user_id,
         action="PREDICT",
         entity="Prediction",
+        entity_id=int(prediction["id"]),
         details={
-            "team1": team1.name,
-            "team2": team2.name,
-            "probability": prediction.get("probabilityTeam1")
-        }
+            "team1": team1["name"],
+            "team2": team2["name"],
+            "probability": prediction.get("probabilityTeam1"),
+            "confidence": prediction.get("confidence")
+        },
+        ip_address=request.client.host if request.client else None
     )
 
     return prediction
@@ -75,16 +80,22 @@ async def predict(
 
 @router.get("/predictions/my", response_model=List[schemas.PredictionResponse])
 async def get_my_predictions(
-        current_user = Depends(get_current_user),
+        request: Request,
         skip: int = 0,
         limit: int = 50,
         db: Session = Depends(get_db)
 ):
     """Получение истории прогнозов текущего пользователя"""
+    user_data = await get_current_user(request)
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Не авторизован"
+        )
 
     ai_svc = ai_service.AIService(db)
     predictions = await ai_svc.get_user_predictions(
-        current_user.id,
+        user_data.user_id,
         skip=skip,
         limit=limit
     )
@@ -94,10 +105,16 @@ async def get_my_predictions(
 @router.get("/predictions/{prediction_id}", response_model=schemas.PredictionResponse)
 async def get_prediction_by_id(
         prediction_id: int,
-        current_user = Depends(get_current_user),
+        request: Request,
         db: Session = Depends(get_db)
 ):
     """Получение прогноза по ID"""
+    user_data = await get_current_user(request)
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Не авторизован"
+        )
 
     ai_svc = ai_service.AIService(db)
     prediction = await ai_svc.get_prediction_by_id(prediction_id)
@@ -109,7 +126,7 @@ async def get_prediction_by_id(
         )
 
     # Проверка прав доступа
-    if prediction["user_id"] != current_user.id and current_user.role != "admin":
+    if prediction.get("user_id") != user_data.user_id and user_data.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Нет доступа к этому прогнозу"
@@ -121,12 +138,12 @@ async def get_prediction_by_id(
 @router.post("/predictions/train/{match_id}")
 async def train_on_match(
         match_id: int,
-        current_user = Depends(get_current_user),
+        request: Request,
         db: Session = Depends(get_db)
 ):
     """Обучение модели на реальном результате матча (только для админов)"""
-    # Проверка прав администратора
-    if current_user.role != "admin":
+    user_data = await get_current_user(request)
+    if not user_data or user_data.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Требуются права администратора"
@@ -145,7 +162,7 @@ async def train_on_match(
             detail=f"Матч с ID {match_id} не найден"
         )
 
-    if match.status != "finished" or match.home_score is None:
+    if match.get("status") != "finished" or match.get("home_score") is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Матч еще не завершен или не имеет результата"
@@ -155,11 +172,12 @@ async def train_on_match(
     result = await ai_svc.train_on_actual_result(match)
 
     audit_svc.log(
-        user_id=current_user.id,
+        user_id=user_data.user_id,
         action="TRAIN_MODEL",
         entity="Match",
         entity_id=match_id,
-        details=result
+        details=result,
+        ip_address=request.client.host if request.client else None
     )
 
     return {
@@ -170,10 +188,16 @@ async def train_on_match(
 
 @router.get("/predict/evaluate")
 async def evaluate_model(
-        current_user = Depends(get_current_user),
+        request: Request,
         db: Session = Depends(get_db)
 ):
     """Оценка точности модели"""
+    user_data = await get_current_user(request)
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Не авторизован"
+        )
 
     ai_svc = ai_service.AIService(db)
     accuracy = await ai_svc.evaluate_model()
@@ -192,10 +216,16 @@ async def evaluate_model(
 
 @router.get("/predict/stats")
 async def get_model_stats(
-        current_user = Depends(get_current_user),
+        request: Request,
         db: Session = Depends(get_db)
 ):
     """Получение статистики модели"""
+    user_data = await get_current_user(request)
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Не авторизован"
+        )
 
     ai_svc = ai_service.AIService(db)
     stats = await ai_svc.get_model_stats()

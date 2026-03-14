@@ -9,8 +9,8 @@ import asyncio
 from tensorflow.keras.models import load_model
 
 # Импортируем функции из наших модулей
-from backend.scripts.update_data import update_db_with_new_games
-from backend.scripts.train_model import train_model
+from scripts.update_data import update_db_with_new_games
+from scripts.train_model import train_model
 
 app = FastAPI()
 
@@ -29,16 +29,25 @@ team_emas = {}
 teams_df = None
 STATS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'pf', 'fg_pct', 'fg3_pct', 'ft_pct']
 MODEL_DIR = "./models"
+<<<<<<< Updated upstream
 DB_PATH = "./nba.sqlite"
+=======
+
+
+# Путь к модели теперь не зависит от SQLite
+
+>>>>>>> Stashed changes
 
 class PredictionRequest(BaseModel):
     home_team: str
     away_team: str
 
+
 class PredictionResponse(BaseModel):
     home_team: str
     away_team: str
     home_win_probability: float
+
 
 @app.on_event("startup")
 def load_artifacts():
@@ -49,21 +58,35 @@ def load_artifacts():
     teams_path = os.path.join(MODEL_DIR, "teams.csv")
 
     if not os.path.exists(model_path):
-        raise RuntimeError("Model not found. Run train_model.py first.")
+        print("⚠️ Model not found. Run train_model.py first.")
+        return
+
     model = load_model(model_path)
     with open(scaler_path, "rb") as f:
         scaler = pickle.load(f)
     with open(emas_path, "rb") as f:
         team_emas = pickle.load(f)
     teams_df = pd.read_csv(teams_path)
+<<<<<<< Updated upstream
+=======
+
+    print("✅ Model artifacts loaded")
+
+>>>>>>> Stashed changes
 
 @app.get("/teams")
 def get_teams():
     """Return list of team abbreviations and names."""
+    if teams_df is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
     return teams_df[['team_abbrev', 'team_name']].drop_duplicates().to_dict(orient='records')
+
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
+    if model is None or scaler is None or teams_df is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
     home_row = teams_df[teams_df['team_abbrev'] == request.home_team]
     away_row = teams_df[teams_df['team_abbrev'] == request.away_team]
     if home_row.empty or away_row.empty:
@@ -93,16 +116,21 @@ def predict(request: PredictionRequest):
         home_win_probability=float(prob)
     )
 
+
 async def retrain_task():
     """Фоновая задача: обновление данных и переобучение."""
     try:
         loop = asyncio.get_event_loop()
         print("Starting data update...")
         # Обновляем базу новыми играми (последние 7 дней)
+<<<<<<< Updated upstream
         await loop.run_in_executor(None, update_db_with_new_games, DB_PATH, 7)
+=======
+        await loop.run_in_executor(None, update_db_with_new_games, None, 7)
+>>>>>>> Stashed changes
         print("Data update completed. Starting model training...")
         # Переобучаем модель
-        await loop.run_in_executor(None, train_model, DB_PATH)
+        await loop.run_in_executor(None, train_model, None)
         print("Model training completed. Reloading artifacts...")
         # Перезагружаем артефакты
         load_artifacts()
@@ -110,12 +138,44 @@ async def retrain_task():
     except Exception as e:
         print(f"❌ Error during retraining: {e}")
 
+
 @app.post("/retrain")
 async def retrain(background_tasks: BackgroundTasks):
     """Запускает обновление данных и переобучение модели в фоне."""
     background_tasks.add_task(retrain_task)
     return {"message": "Retraining started in background. This may take several minutes."}
 
+
 @app.get("/")
 def root():
+<<<<<<< Updated upstream
     return {"message": "NBA Game Predictor API"}
+=======
+    return {"message": "NBA Game Predictor API", "database": "PostgreSQL"}
+
+
+@app.get("/db-info")
+def db_info():
+    """Возвращает информацию о текущей базе данных"""
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+        tables = db.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """).fetchall()
+        db.close()
+
+        return {
+            "database": "PostgreSQL",
+            "connected": True,
+            "tables": [t[0] for t in tables]
+        }
+    except Exception as e:
+        return {
+            "database": "PostgreSQL",
+            "connected": False,
+            "error": str(e)
+        }
+>>>>>>> Stashed changes

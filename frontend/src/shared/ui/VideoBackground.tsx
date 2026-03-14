@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface VideoBackgroundProps {
   videoSrc: string;
@@ -6,55 +6,63 @@ interface VideoBackgroundProps {
   playbackSpeed?: number;
 }
 
-export const VideoBackground = ({
-  videoSrc,
-  overlayOpacity = 0.18,
-  playbackSpeed = 1,
-}: VideoBackgroundProps) => {
+export const VideoBackground: React.FC<VideoBackgroundProps> = ({ 
+  videoSrc, 
+  overlayOpacity = 0.25,
+  playbackSpeed = 1.0
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
   useEffect(() => {
-    if (!videoRef.current) {
-      return;
-    }
-
-    videoRef.current.playbackRate = playbackSpeed;
-    const playPromise = videoRef.current.play();
-
-    if (playPromise) {
-      playPromise.catch(() => {
-        // Browser autoplay restrictions are fine here.
-      });
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackSpeed;
+      videoRef.current.preload = 'auto';
+      
+      const playPromise = videoRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Autoplay prevented:', error);
+        });
+      }
     }
   }, [playbackSpeed]);
 
-  return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      {!isVideoLoaded && <div className="absolute inset-0 bg-[linear-gradient(180deg,#08111e,#050b14)]" />}
+  const handleLoadedData = () => {
+    setIsVideoLoaded(true);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackSpeed;
+    }
+  };
 
+  return (
+    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      {/* Плейсхолдер */}
+      {!isVideoLoaded && (
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-950" />
+      )}
+      
+      {/* ВИДЕО НА ВЕСЬ ЭКРАН */}
       <video
         ref={videoRef}
         autoPlay
         loop
         muted
         playsInline
-        preload="auto"
-        onLoadedData={() => setIsVideoLoaded(true)}
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{
+        onLoadedData={handleLoadedData}
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ 
+          filter: 'brightness(0.8) contrast(1.1)',
           opacity: isVideoLoaded ? 1 : 0,
-          filter: 'blur(0px) saturate(0.92) contrast(1.06) brightness(0.58)',
-          transition: 'opacity 900ms ease',
+          transition: 'opacity 1s ease'
         }}
       >
         <source src={videoSrc} type="video/mp4" />
       </video>
-
-      <div
-        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,10,0.76),rgba(5,7,10,0.26),rgba(5,7,10,0.82))]"
-        style={{ opacity: overlayOpacity }}
-      />
+      
+      {/* Затемнение */}
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/30 via-transparent to-slate-950/30" />
     </div>
   );
 };
