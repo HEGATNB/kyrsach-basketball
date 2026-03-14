@@ -1,387 +1,432 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Activity, 
-  Trophy, 
-  TrendingUp, 
-  Cpu, 
-  Flame, 
-  Target, 
-  Zap,
-  Users
-} from 'lucide-react';
-import { GlowingCard } from '@/shared/ui/GlowingCard';
-import { apiRequest } from '@/shared/api/client';
-import type { Team, Match, Prediction } from '@/shared/api/client';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Activity,
+  ArrowRight,
+  CalendarDays,
+  Clock3,
+  Cpu,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+} from 'lucide-react';
+import { apiRequest, type Match, type Prediction, type Team } from '@/shared/api/client';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { 
-  LineChartComponent, 
-  BarChartComponent, 
-  PieChartComponent, 
-  RadarChartComponent 
-} from '@/shared/ui/Charts';
+import { GlowingCard } from '@/shared/ui/GlowingCard';
+import { TeamMark } from '@/shared/ui/TeamMark';
+
+type HomeTab = 'overview' | 'schedule' | 'teams' | 'predictions';
+
+const tabs: Array<{ id: HomeTab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'teams', label: 'Teams' },
+  { id: 'predictions', label: 'Predictions' },
+];
 
 export const HomePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<HomeTab>('overview');
   const [teams, setTeams] = useState<Team[]>([]);
-  const [recentMatches, setRecentMatches] = useState<Match[]>([]);
-  const [recentPredictions, setRecentPredictions] = useState<Prediction[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [stats, setStats] = useState<{ accuracy?: number; totalTrainingData?: number; totalPredictions?: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [aiConfidence, setAiConfidence] = useState(0);
-  const [liveScore] = useState({ home: 108, away: 102 });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAiConfidence(prev => (prev < 87 ? prev + 1 : 87));
-    }, 18);
-    return () => clearInterval(interval);
-  }, []);
+    const load = async () => {
+      try {
+        const [teamsData, matchesData, statsData] = await Promise.all([
+          apiRequest<Team[]>('/teams'),
+          apiRequest<Match[]>('/matches?limit=8'),
+          apiRequest<any>('/predict/stats'),
+        ]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+        setTeams(teamsData.sort((left, right) => right.wins - left.wins));
+        setMatches(matchesData);
+        setStats(statsData);
 
-  const loadData = async () => {
-    try {
-      const [teamsData, matchesData] = await Promise.all([
-        apiRequest<Team[]>('/teams'),
-        apiRequest<Match[]>('/matches?status=finished&limit=5')
-      ]);
-      
-      setTeams(teamsData.slice(0, 3)); // Топ-3 команды для показа
-      setRecentMatches(matchesData.slice(0, 3));
-
-      if (user) {
-        const predictions = await apiRequest<Prediction[]>('/predictions/my');
-        setRecentPredictions(predictions.slice(0, 3));
+        if (user) {
+          const predictionData = await apiRequest<Prediction[]>('/predictions/my');
+          setPredictions(predictionData.slice(0, 5));
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const stats = [
-    { label: 'Точность модели', value: `${aiConfidence}%`, trend: '+2.4%', icon: Target, color: 'orange' },
-    { label: 'Всего команд', value: teams.length.toString(), sub: 'в лиге', icon: Activity, color: 'blue' },
-    { label: 'Активных матчей', value: '4', sub: 'сегодня', icon: Zap, color: 'green' },
-    { label: 'ROI', value: '+18%', trend: 'стабильно', icon: TrendingUp, color: 'purple' },
-  ];
+    load();
+  }, [user]);
+
+  const featuredMatch = useMemo(() => matches.find((match) => match.status !== 'finished') || matches[0] || null, [matches]);
+  const topTeams = useMemo(() => teams.slice(0, 6), [teams]);
+  const upcomingMatches = useMemo(() => matches.filter((match) => match.status !== 'finished'), [matches]);
+  const recentMatches = useMemo(() => matches.filter((match) => match.status === 'finished'), [matches]);
+
+  const summary = useMemo(
+    () => [
+      {
+        label: 'Accuracy',
+        value: `${Math.round(stats?.accuracy ?? 0)}%`,
+        detail: 'model validation',
+        icon: Cpu,
+      },
+      {
+        label: 'Teams',
+        value: `${teams.length}`,
+        detail: 'tracked profiles',
+        icon: Trophy,
+      },
+      {
+        label: 'Games',
+        value: `${matches.length}`,
+        detail: 'loaded fixtures',
+        icon: CalendarDays,
+      },
+      {
+        label: 'Samples',
+        value: `${stats?.totalTrainingData ?? 0}`,
+        detail: 'historical records',
+        icon: Activity,
+      },
+    ],
+    [matches.length, stats, teams.length],
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400">Загрузка данных...</p>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-16 w-16 rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b] animate-spin" />
+          <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Loading dashboard</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="flex flex-col md:flex-row md:items-end md:justify-between gap-4"
-      >
-        <div>
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight font-spacegrotesk text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
-            Hoops<span className="text-orange-500 text-glow-orange">AI</span>
-          </h1>
-          <p className="text-slate-400 text-lg mt-2 max-w-2xl">
-            Платформа продвинутой аналитики NBA с интеграцией нейросетей
-          </p>
-          {!user && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/auth')}
-              className="mt-6 px-8 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 flex items-center gap-2"
-            >
-              <Zap className="w-5 h-5" />
-              Зарегистрироваться
-            </motion.button>
-          )}
-        </div>
-        <div className="flex items-center gap-3 bg-slate-900/50 backdrop-blur-xl px-4 py-2 rounded-2xl border border-slate-800/50">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-          </span>
-          <span className="text-sm font-medium text-green-400 animate-pulse">
-            {user ? `Привет, ${user.username}` : 'SYSTEM ONLINE'}
-          </span>
-        </div>
-      </motion.div>
+    <div className="space-y-6">
+      <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+        <GlowingCard glowColor="orange" className="p-7">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="data-chip">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Connected stack
+            </span>
+            <span className="data-chip">
+              <Sparkles className="h-3.5 w-3.5" />
+              Live basketball workspace
+            </span>
+          </div>
 
-      {/* Карточки статистики */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <GlowingCard
-            key={stat.label}
-            glowColor={stat.color as any}
-            delay={index * 0.1}
-            className="p-6"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 bg-slate-800/50 rounded-xl">
-                <stat.icon className={`w-6 h-6 text-${stat.color}-400`} />
-              </div>
-              {stat.trend && (
-                <span className={`text-sm font-medium text-${stat.color}-400 bg-${stat.color}-500/10 px-2 py-1 rounded-lg`}>
-                  {stat.trend}
-                </span>
-              )}
-            </div>
+          <div className="mt-5 max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Dashboard</p>
+            <h1 className="mt-2 font-spacegrotesk text-3xl font-bold text-white sm:text-4xl">
+              Cleaner match intelligence, less landing-page noise.
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+              The home screen now works more like a sports hub: key metrics first, current matchup second, and the rest
+              of the information split into clearer sections instead of one long decorative feed.
+            </p>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button onClick={() => navigate(user ? '/prediction/new' : '/auth')} className="btn-primary">
+              {user ? 'New prediction' : 'Sign in'}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button onClick={() => navigate('/matches')} className="btn-secondary">
+              Open schedule
+            </button>
+          </div>
+        </GlowingCard>
+
+        <GlowingCard glowColor="blue" className="p-6">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-slate-400 text-sm mb-1">{stat.label}</p>
-              <p className="text-3xl font-bold font-spacegrotesk">{stat.value}</p>
-              {stat.sub && <p className="text-xs text-slate-500 mt-1">{stat.sub}</p>}
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Featured game</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">
+                {featuredMatch ? `${featuredMatch.homeTeam.abbrev} vs ${featuredMatch.awayTeam.abbrev}` : 'No game loaded'}
+              </h2>
+            </div>
+            <span className="data-chip">{featuredMatch?.status === 'finished' ? 'Final' : 'Preview'}</span>
+          </div>
+
+          {featuredMatch ? (
+            <div className="mt-6 space-y-4">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                <div className="surface-muted text-center">
+                  <TeamMark team={featuredMatch.homeTeam} size="md" className="mx-auto" />
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{featuredMatch.homeTeam.city || 'Home'}</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{featuredMatch.homeTeam.name}</p>
+                  <p className="mt-3 text-3xl font-bold tabular-nums text-[#ecd8ab]">{featuredMatch.homeScore ?? '--'}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Tipoff</p>
+                  <p className="mt-2 text-sm font-medium text-slate-300">
+                    {new Date(featuredMatch.date).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="surface-muted text-center">
+                  <TeamMark team={featuredMatch.awayTeam} size="md" className="mx-auto" />
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{featuredMatch.awayTeam.city || 'Away'}</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{featuredMatch.awayTeam.name}</p>
+                  <p className="mt-3 text-3xl font-bold tabular-nums text-[#d6e1eb]">{featuredMatch.awayScore ?? '--'}</p>
+                </div>
+              </div>
+
+              <div className="surface-muted">
+                <div className="flex items-center justify-between text-sm text-slate-300">
+                  <span>Model confidence</span>
+                  <span className="tabular-nums">{Math.round(stats?.accuracy ?? 0)}%</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-900/70">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#c96a2b,#d8b46a)]"
+                    style={{ width: `${Math.max(18, Math.round(stats?.accuracy ?? 0))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-6 text-sm text-slate-400">The next loaded fixture will appear here.</p>
+          )}
+        </GlowingCard>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {summary.map((item) => (
+          <GlowingCard key={item.label} className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+                <p className="mt-3 text-3xl font-semibold text-white">{item.value}</p>
+                <p className="mt-2 text-sm text-slate-400">{item.detail}</p>
+              </div>
+              <div className="rounded-lg border border-white/8 bg-white/[0.04] p-2.5 text-slate-200">
+                <item.icon className="h-4 w-4" />
+              </div>
             </div>
           </GlowingCard>
         ))}
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* AI Predictor */}
-        <GlowingCard
-          glowColor="orange"
-          className="lg:col-span-2 p-8"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Cpu className="w-8 h-8 text-orange-400" />
-              <div>
-                <h3 className="text-xl font-bold">AI Match Predictor</h3>
-                <p className="text-sm text-slate-400">Модель v2.4 • Обучена на 14,841 матчах</p>
-              </div>
-            </div>
+      <section className="space-y-4">
+        <div className="segmented-bar">
+          {tabs.map((tab) => (
             <button
-              onClick={() => navigate('/prediction/new')}
-              className="px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`segmented-item ${activeTab === tab.id ? 'segmented-item-active' : ''}`}
             >
-              Новый прогноз
+              {tab.label}
             </button>
-          </div>
-
-          <div className="flex items-center justify-between mb-8">
-            <div className="text-center flex-1">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mb-3 shadow-xl shadow-orange-500/30">
-                <span className="text-3xl font-black text-white">BOS</span>
-              </div>
-              <p className="text-slate-300 font-medium">Boston Celtics</p>
-              <p className="text-sm text-slate-500 mt-1">39-21</p>
-            </div>
-
-            <div className="flex flex-col items-center px-6">
-              <div className="text-6xl font-black font-spacegrotesk text-white mb-2">
-                {liveScore.home} : {liveScore.away}
-              </div>
-              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-orange-500 to-yellow-400"
-                  initial={{ width: '65%' }}
-                  animate={{ width: '65%' }}
-                  transition={{ duration: 1 }}
-                />
-              </div>
-              <p className="text-sm text-slate-400 mt-2">
-                Home Win Probability: <span className="text-orange-400 font-bold">65%</span>
-              </p>
-            </div>
-
-            <div className="text-center flex-1">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-3 shadow-xl shadow-blue-500/30">
-                <span className="text-3xl font-black text-white">MIA</span>
-              </div>
-              <p className="text-slate-300 font-medium">Miami Heat</p>
-              <p className="text-sm text-slate-500 mt-1">32-28</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'Точность', value: '87%', color: 'orange' },
-              { label: 'Уверенность', value: 'High', color: 'green' },
-              { label: 'Фактор дома', value: '+5%', color: 'blue' },
-            ].map((item) => (
-              <div key={item.label} className="text-center p-3 bg-slate-800/30 rounded-xl">
-                <p className="text-xs text-slate-400 mb-1">{item.label}</p>
-                <p className={`text-lg font-bold text-${item.color}-400`}>{item.value}</p>
-              </div>
-            ))}
-          </div>
-        </GlowingCard>
-
-        {/* Боковая панель */}
-        <div className="space-y-6">
-          {/* Топ команды */}
-          <GlowingCard glowColor="purple" className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy className="w-5 h-5 text-yellow-400" />
-              <h3 className="font-bold">Топ команды</h3>
-            </div>
-            <div className="space-y-3">
-              {teams.map((team, i) => (
-                <div key={team.id} className="flex items-center justify-between p-2 bg-slate-800/30 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-mono text-slate-400">#{i + 1}</span>
-                    <span className="font-medium">{team.name}</span>
-                  </div>
-                  <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded-full">
-                    {team.wins}-{team.losses}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </GlowingCard>
-
-          {/* Последние матчи */}
-          <GlowingCard glowColor="orange" className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Flame className="w-5 h-5 text-red-400" />
-              <h3 className="font-bold">Последние матчи</h3>
-            </div>
-            <div className="space-y-3">
-              {recentMatches.map((match) => (
-                <div key={match.id} className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">{match.home_team?.name || 'Unknown'} vs {match.away_team?.name || 'Unknown'}</span>
-                  <span className="text-sm font-mono text-orange-400">
-                    {match.homeScore}:{match.awayScore}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </GlowingCard>
-
-          {/* Топ скореры */}
-          <GlowingCard glowColor="blue" className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="w-5 h-5 text-blue-400" />
-              <h3 className="font-bold">Топ скореры</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Luka Dončić</span>
-                <span className="text-blue-400">32.4 PPG</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Shai Gilgeous-Alexander</span>
-                <span className="text-blue-400">31.1 PPG</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Giannis Antetokounmpo</span>
-                <span className="text-blue-400">30.7 PPG</span>
-              </div>
-            </div>
-          </GlowingCard>
+          ))}
         </div>
-      </div>
 
-      {/* Последние прогнозы пользователя */}
-      {user && recentPredictions.length > 0 && (
-        <GlowingCard glowColor="green" className="p-6">
-          <h3 className="text-lg font-bold mb-4">Ваши последние прогнозы</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {recentPredictions.map((pred) => (
-              <div key={pred.id} className="bg-slate-800/30 p-4 rounded-xl">
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm text-slate-400">
-                    {new Date(pred.createdAt).toLocaleDateString()}
-                  </span>
-                  <span className="text-xs px-2 py-1 bg-orange-500/20 text-orange-400 rounded-full">
-                    {pred.confidence}% уверенность
-                  </span>
+        {activeTab === 'overview' && (
+          <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+            <GlowingCard glowColor="orange" className="p-6">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Notes</p>
+              <div className="mt-4 grid gap-3">
+                <div className="surface-muted">
+                  <p className="text-sm font-semibold text-white">Prediction engine</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Historical sample size is stable and the prediction endpoint is responding through the live backend.
+                  </p>
                 </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{pred.team1?.name}</p>
-                    <p className="text-sm text-orange-400">{pred.probabilityTeam1}%</p>
-                  </div>
-                  <span className="text-slate-500">vs</span>
-                  <div className="text-right">
-                    <p className="font-medium">{pred.team2?.name}</p>
-                    <p className="text-sm text-blue-400">{pred.probabilityTeam2}%</p>
-                  </div>
+                <div className="surface-muted">
+                  <p className="text-sm font-semibold text-white">Current schedule window</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    {upcomingMatches.length} upcoming games and {recentMatches.length} finished games are available for browsing.
+                  </p>
+                </div>
+                <div className="surface-muted">
+                  <p className="text-sm font-semibold text-white">Navigation cleanup</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Instead of stacking everything vertically, the home page now separates schedule, team and prediction views into tabs.
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
-        </GlowingCard>
-      )}
+            </GlowingCard>
 
-      {/* Графики статистики */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-        <LineChartComponent
-          title="Точность модели по месяцам"
-          data={accuracyData}
-          dataKey="accuracy"
-          xAxisKey="month"
-        />
-        
-        <BarChartComponent
-          title="Активность прогнозов"
-          data={predictionsData}
-          dataKey="count"
-          xAxisKey="day"
-        />
-        
-        <PieChartComponent
-          title="Точность прогнозов"
-          data={pieData}
-          nameKey="name"
-          valueKey="value"
-        />
-        
-        <RadarChartComponent
-          title="Сравнение топ-команд"
-          data={teamComparisonData}
-          dataKeys={['Lakers', 'Celtics', 'Warriors']}
-        />
-      </div>
+            <GlowingCard glowColor="green" className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Standings snapshot</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">Top teams</h2>
+                </div>
+                <button onClick={() => navigate('/teams')} className="btn-secondary">
+                  Full standings
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {topTeams.map((team, index) => (
+                  <button
+                    key={team.id}
+                    onClick={() => navigate(`/teams/${team.id}`)}
+                    className="flex w-full items-center justify-between rounded-[14px] border border-white/8 bg-white/[0.03] px-4 py-4 text-left transition hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-6 text-sm font-semibold text-slate-500">{index + 1}</div>
+                      <TeamMark team={team} size="sm" />
+                      <div>
+                        <p className="text-sm font-semibold text-white">{team.name}</p>
+                        <p className="text-xs text-slate-400">{team.division?.name || 'Division'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-white">
+                        {team.wins}-{team.losses}
+                      </p>
+                      <p className="text-xs text-slate-400">{team.avgPointsFor.toFixed(1)} PPG</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </GlowingCard>
+          </div>
+        )}
+
+        {activeTab === 'schedule' && (
+          <GlowingCard glowColor="blue" className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Schedule</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">Recent and upcoming games</h2>
+              </div>
+              <button onClick={() => navigate('/matches')} className="btn-secondary">
+                All games
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              {matches.map((match) => (
+                <button
+                  key={match.id}
+                  onClick={() => navigate(`/matches/${match.id}`)}
+                    className="grid w-full gap-3 rounded-[14px] border border-white/8 bg-white/[0.03] px-4 py-4 text-left transition hover:bg-white/[0.05] md:grid-cols-[160px_1fr_auto]"
+                >
+                  <div className="flex items-center gap-2 text-sm text-slate-400">
+                    <Clock3 className="h-4 w-4" />
+                    {new Date(match.date).toLocaleDateString()}
+                  </div>
+                  <div className="flex items-center gap-3 text-sm font-semibold text-white">
+                    <TeamMark team={match.homeTeam} size="sm" />
+                    <span className="truncate">{match.homeTeam.abbrev}</span>
+                    <span className="text-slate-500">vs</span>
+                    <TeamMark team={match.awayTeam} size="sm" />
+                    <span className="truncate">{match.awayTeam.abbrev}</span>
+                  </div>
+                  <div className="text-right text-sm tabular-nums text-slate-300">
+                    {match.homeScore ?? '--'} : {match.awayScore ?? '--'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </GlowingCard>
+        )}
+
+        {activeTab === 'teams' && (
+          <GlowingCard glowColor="green" className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Team board</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">League leaders</h2>
+              </div>
+              <button onClick={() => navigate('/teams')} className="btn-secondary">
+                Team index
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {topTeams.map((team) => (
+                <button
+                  key={team.id}
+                  onClick={() => navigate(`/teams/${team.id}`)}
+                  className="rounded-[14px] border border-white/8 bg-white/[0.03] px-4 py-4 text-left transition hover:bg-white/[0.05]"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <TeamMark team={team} size="sm" />
+                      <div>
+                      <p className="text-lg font-semibold text-white">{team.name}</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {team.city || 'City'} / {team.conference?.shortName || team.conference?.name || 'League'}
+                      </p>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/8 bg-white/[0.04] px-3 py-2 text-sm font-semibold tabular-nums text-white">
+                      {team.wins}-{team.losses}
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-900/70">
+                    <div
+                      className="h-full rounded-full bg-[linear-gradient(90deg,#c96a2b,#607d96)]"
+                      style={{ width: `${Math.max(14, (team.wins / Math.max(1, team.wins + team.losses)) * 100)}%` }}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </GlowingCard>
+        )}
+
+        {activeTab === 'predictions' && (
+          <GlowingCard glowColor="purple" className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Prediction lane</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">
+                  {user ? 'Recent model runs' : 'Prediction workspace'}
+                </h2>
+              </div>
+              <button onClick={() => navigate(user ? '/history' : '/auth')} className="btn-secondary">
+                {user ? 'History' : 'Sign in'}
+              </button>
+            </div>
+
+            {user && predictions.length > 0 ? (
+              <div className="mt-5 grid gap-3">
+                {predictions.map((prediction) => (
+                  <button
+                    key={prediction.id}
+                    onClick={() => navigate(`/prediction/${prediction.id}`)}
+                    className="flex w-full items-center justify-between rounded-[14px] border border-white/8 bg-white/[0.03] px-4 py-4 text-left transition hover:bg-white/[0.05]"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {prediction.team1?.abbrev} vs {prediction.team2?.abbrev}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {prediction.expectedScoreTeam1}:{prediction.expectedScoreTeam2} expected score
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold tabular-nums text-[#ecd8ab]">{prediction.confidence}%</p>
+                      <p className="text-xs text-slate-500">{new Date(prediction.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[14px] border border-white/8 bg-white/[0.03] px-5 py-6">
+                <p className="text-sm leading-6 text-slate-300">
+                  {user
+                    ? 'You have not saved any prediction runs yet. Start with a matchup and the result will appear here and in history.'
+                    : 'Sign in to save predictions, revisit results and compare model outputs over time.'}
+                </p>
+              </div>
+            )}
+          </GlowingCard>
+        )}
+      </section>
     </div>
   );
 };
-
-// Данные для графиков
-const accuracyData = [
-  { month: 'Янв', accuracy: 65 },
-  { month: 'Фев', accuracy: 68 },
-  { month: 'Мар', accuracy: 72 },
-  { month: 'Апр', accuracy: 75 },
-  { month: 'Май', accuracy: 79 },
-  { month: 'Июн', accuracy: 82 },
-  { month: 'Июл', accuracy: 84 },
-  { month: 'Авг', accuracy: 86 },
-  { month: 'Сен', accuracy: 87 },
-];
-
-const predictionsData = [
-  { day: 'Пн', count: 12 },
-  { day: 'Вт', count: 18 },
-  { day: 'Ср', count: 15 },
-  { day: 'Чт', count: 24 },
-  { day: 'Пт', count: 32 },
-  { day: 'Сб', count: 45 },
-  { day: 'Вс', count: 38 },
-];
-
-const pieData = [
-  { name: 'Точные', value: 68 },
-  { name: 'Неточные', value: 32 },
-];
-
-const teamComparisonData = [
-  { metric: 'Очки', Lakers: 115, Celtics: 118, Warriors: 122 },
-  { metric: 'Подборы', Lakers: 42, Celtics: 44, Warriors: 43 },
-  { metric: 'Передачи', Lakers: 26, Celtics: 28, Warriors: 29 },
-  { metric: 'Перехваты', Lakers: 7, Celtics: 8, Warriors: 7 },
-  { metric: 'Блоки', Lakers: 5, Celtics: 6, Warriors: 5 },
-];
 
 export default HomePage;

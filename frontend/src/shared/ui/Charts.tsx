@@ -10,7 +10,7 @@ import {
 import { GlowingCard } from './GlowingCard';
 
 // Цвета для графиков
-const COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
+const COLORS = ['#c96a2b', '#607d96', '#728b74', '#d8b46a', '#8d6b5d', '#56786f'];
 
 interface ChartProps {
   title?: string;
@@ -20,7 +20,7 @@ interface ChartProps {
 
 // Линейный график (тренды)
 export const LineChartComponent = ({ 
-  title, data, dataKey, xAxisKey, color = '#f97316', className = '' 
+  title, data, dataKey, xAxisKey, color = '#c96a2b', className = '' 
 }: ChartProps & { 
   dataKey: string; 
   xAxisKey: string;
@@ -36,8 +36,8 @@ export const LineChartComponent = ({
             <XAxis dataKey={xAxisKey} stroke="#94a3b8" />
             <YAxis stroke="#94a3b8" />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
-              labelStyle={{ color: '#f8fafc' }}
+              contentStyle={{ backgroundColor: '#161d26', border: '1px solid rgba(244,233,215,0.1)', borderRadius: 16 }}
+              labelStyle={{ color: '#f5efe4' }}
             />
             <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={3} dot={{ fill: color }} />
           </LineChart>
@@ -64,10 +64,10 @@ export const BarChartComponent = ({
             <XAxis dataKey={xAxisKey} stroke="#94a3b8" />
             <YAxis stroke="#94a3b8" />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
-              labelStyle={{ color: '#f8fafc' }}
+              contentStyle={{ backgroundColor: '#161d26', border: '1px solid rgba(244,233,215,0.1)', borderRadius: 16 }}
+              labelStyle={{ color: '#f5efe4' }}
             />
-            <Bar dataKey={dataKey} fill="#f97316" radius={[4, 4, 0, 0]} />
+            <Bar dataKey={dataKey} fill="#c96a2b" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -95,7 +95,7 @@ export const PieChartComponent = ({
               labelLine={false}
               label={(entry: any) => `${entry[nameKey]}: ${entry[valueKey]}%`}
               outerRadius={80}
-              fill="#8884d8"
+              fill="#607d96"
               dataKey={valueKey}
             >
               {data.map((_entry, index) => (
@@ -103,7 +103,7 @@ export const PieChartComponent = ({
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
+              contentStyle={{ backgroundColor: '#161d26', border: '1px solid rgba(244,233,215,0.1)', borderRadius: 16 }}
             />
           </PieChart>
         </ResponsiveContainer>
@@ -139,7 +139,7 @@ export const RadarChartComponent = ({
             ))}
             <Legend />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
+              contentStyle={{ backgroundColor: '#161d26', border: '1px solid rgba(244,233,215,0.1)', borderRadius: 16 }}
             />
           </RadarChart>
         </ResponsiveContainer>
@@ -152,7 +152,7 @@ export const RadarChartComponent = ({
 export const ProgressBar = ({ 
   value, 
   max = 100, 
-  color = '#f97316',
+  color = '#c96a2b',
   label
 }: { value: number; max?: number; color?: string; label?: string }) => {
   const percentage = (value / max) * 100;

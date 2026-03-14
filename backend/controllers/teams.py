@@ -6,7 +6,7 @@ from database import get_db
 import schemas
 from services.team_service import TeamService
 from services.audit_service import AuditService
-from middleware.auth import require_admin_or_operator, require_admin, get_current_user
+from middleware.auth import require_admin_or_operator, require_admin, get_current_user  # добавлено
 
 router = APIRouter()
 
@@ -19,13 +19,7 @@ async def get_all_teams(
 ):
     """Получение списка всех команд"""
     team_service = TeamService(db)
-    teams = team_service.get_all_teams(skip=skip, limit=limit)
-
-    if not teams:
-        # Если нет команд, возвращаем пустой список
-        return []
-
-    return teams
+    return team_service.get_all_teams(skip=skip, limit=limit)
 
 
 @router.get("/{team_id}", response_model=schemas.TeamResponse)
@@ -55,39 +49,26 @@ async def create_team(
 
     team_service = TeamService(db)
 
-    # Проверка существования команды с таким названием
-    existing = team_service.get_team_by_name(team_data.full_name)
+    existing = team_service.get_team_by_name(team_data.name)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Команда с таким названием уже существует"
         )
 
-    try:
-        team = team_service.create_team(team_data, user.user_id)
+    team = team_service.create_team(team_data, user.user_id)
 
-        # Логирование
-        audit_service = AuditService(db)
-        audit_service.log(
-            user_id=user.user_id,
-            action="CREATE",
-            entity="Team",
-            entity_id=team["id"],
-            details={"name": team_data.full_name},
-            ip_address=request.client.host if request.client else None
-        )
+    # Логирование
+    audit_service = AuditService(db)
+    audit_service.log(
+        user_id=user.user_id,
+        action="CREATE",
+        entity="Team",
+        entity_id=team["id"],
+        details={"name": team_data.name}
+    )
 
-        return team
-    except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при создании команды: {str(e)}"
-        )
+    return team
 
 
 @router.put("/{team_id}", response_model=schemas.TeamResponse)
@@ -110,30 +91,18 @@ async def update_team(
             detail=f"Команда с ID {team_id} не найдена"
         )
 
-    try:
-        updated_team = team_service.update_team(team_id, team_data, user.user_id)
+    updated_team = team_service.update_team(team_id, team_data, user.user_id)
 
-        audit_service = AuditService(db)
-        audit_service.log(
-            user_id=user.user_id,
-            action="UPDATE",
-            entity="Team",
-            entity_id=team_id,
-            details=team_data.dict(exclude_unset=True),
-            ip_address=request.client.host if request.client else None
-        )
+    audit_service = AuditService(db)
+    audit_service.log(
+        user_id=user.user_id,
+        action="UPDATE",
+        entity="Team",
+        entity_id=team_id,
+        details=team_data.dict(exclude_unset=True)
+    )
 
-        return updated_team
-    except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при обновлении команды: {str(e)}"
-        )
+    return updated_team
 
 
 @router.delete("/{team_id}")
@@ -155,27 +124,15 @@ async def delete_team(
             detail=f"Команда с ID {team_id} не найдена"
         )
 
-    try:
-        deleted_team = team_service.delete_team(team_id, user.user_id)
+    deleted_team = team_service.delete_team(team_id, user.user_id)
 
-        audit_service = AuditService(db)
-        audit_service.log(
-            user_id=user.user_id,
-            action="DELETE",
-            entity="Team",
-            entity_id=team_id,
-            details={"name": team["name"]},
-            ip_address=request.client.host if request.client else None
-        )
+    audit_service = AuditService(db)
+    audit_service.log(
+        user_id=user.user_id,
+        action="DELETE",
+        entity="Team",
+        entity_id=team_id,
+        details={"name": team["name"]}
+    )
 
-        return {"message": "Команда удалена", "team": deleted_team}
-    except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при удалении команды: {str(e)}"
-        )
+    return {"message": "Команда удалена", "team": deleted_team}

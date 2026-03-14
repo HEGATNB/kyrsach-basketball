@@ -74,10 +74,3 @@ tsconfig.json
 backups/
 *.backup
 *.bak
-
-*.key
-*.pem
-*.crt
-secrets/
-credentials/
-service-account*.json

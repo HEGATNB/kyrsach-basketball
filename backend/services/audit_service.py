@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+import sqlite3
 from datetime import datetime
 import json
 import sys
@@ -8,163 +8,93 @@ from typing import Optional, Any
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+DB_PATH = "./nba.sqlite"
+
 
 class AuditService:
     def __init__(self, db: Session):
         self.db = db
-        self._create_audit_table()
-
-    def _create_audit_table(self):
-        """Создает таблицу audit_logs в PostgreSQL если её нет"""
-        try:
-            self.db.execute(text("""
-                CREATE TABLE IF NOT EXISTS audit_logs (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER,
-                    action VARCHAR(50),
-                    entity VARCHAR(50),
-                    entity_id INTEGER,
-                    details TEXT,
-                    ip_address VARCHAR(45),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            self.db.commit()
-            print("✅ Таблица audit_logs создана/проверена в PostgreSQL")
-        except Exception as e:
-            print(f"❌ Ошибка при создании таблицы audit_logs: {e}")
-            self.db.rollback()
+        self.conn = sqlite3.connect(DB_PATH)
+        self.conn.row_factory = sqlite3.Row
 
     def log(self, user_id: int, action: str, entity: str = None,
             entity_id: int = None, details: Any = None, ip_address: str = None):
         """Логирование действия пользователя"""
-        try:
-            details_json = json.dumps(details, ensure_ascii=False) if details else None
+        cursor = self.conn.cursor()
 
-            result = self.db.execute(
-                text("""
-                    INSERT INTO audit_logs 
-                    (user_id, action, entity, entity_id, details, ip_address, created_at) 
-                    VALUES (:user_id, :action, :entity, :entity_id, :details, :ip_address, :created_at)
-                    RETURNING id
-                """),
-                {
-                    "user_id": user_id,
-                    "action": action,
-                    "entity": entity,
-                    "entity_id": entity_id,
-                    "details": details_json,
-                    "ip_address": ip_address,
-                    "created_at": datetime.utcnow()
-                }
+        # Создаем таблицу если нет
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                action TEXT,
+                entity TEXT,
+                entity_id INTEGER,
+                details TEXT,
+                ip_address TEXT,
+                created_at TIMESTAMP
             )
-            self.db.commit()
+        ''')
 
-            log_id = result.scalar()
-            return {
-                "id": log_id,
-                "user_id": user_id,
-                "action": action,
-                "entity": entity,
-                "entity_id": entity_id,
-                "details": details,
-                "ip_address": ip_address,
-                "created_at": datetime.utcnow().isoformat()
-            }
-        except Exception as e:
-            print(f"❌ Ошибка логирования: {e}")
-            self.db.rollback()
-            return None
+        audit_log = {
+            "user_id": user_id,
+            "action": action,
+            "entity": entity,
+            "entity_id": entity_id,
+            "details": json.dumps(details, ensure_ascii=False) if details else None,
+            "ip_address": ip_address,
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+        cursor.execute(
+            """INSERT INTO audit_logs 
+               (user_id, action, entity, entity_id, details, ip_address, created_at) 
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (audit_log["user_id"], audit_log["action"], audit_log["entity"],
+             audit_log["entity_id"], audit_log["details"], audit_log["ip_address"],
+             audit_log["created_at"])
+        )
+        self.conn.commit()
+
+        log_id = cursor.lastrowid
+        audit_log["id"] = log_id
+        return audit_log
 
     def get_user_logs(self, user_id: int, limit: int = 100):
         """Получение логов пользователя"""
-        try:
-            result = self.db.execute(
-                text("""
-                    SELECT * FROM audit_logs 
-                    WHERE user_id = :user_id 
-                    ORDER BY created_at DESC 
-                    LIMIT :limit
-                """),
-                {"user_id": user_id, "limit": limit}
-            ).fetchall()
-
-            logs = []
-            for row in result:
-                log = dict(row._mapping)
-                if log.get("details"):
-                    try:
-                        log["details"] = json.loads(log["details"])
-                    except:
-                        pass
-                logs.append(log)
-
-            return logs
-        except Exception as e:
-            print(f"❌ Ошибка получения логов пользователя: {e}")
-            return []
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """SELECT * FROM audit_logs 
+               WHERE user_id = ? 
+               ORDER BY created_at DESC 
+               LIMIT ?""",
+            (user_id, limit)
+        )
+        return [dict(row) for row in cursor.fetchall()]
 
     def get_all_logs(self, limit: int = 100):
-        """Получение всех логов с информацией о пользователе"""
-        try:
-            # Проверяем, существует ли таблица users
-            self.db.execute(text("SELECT 1 FROM users LIMIT 1")).fetchone()
-            has_users = True
-        except:
-            has_users = False
-
-        try:
-            if has_users:
-                result = self.db.execute(
-                    text("""
-                        SELECT a.*, u.name as user_name, u.email as user_email 
-                        FROM audit_logs a
-                        LEFT JOIN users u ON a.user_id = u.id
-                        ORDER BY a.created_at DESC 
-                        LIMIT :limit
-                    """),
-                    {"limit": limit}
-                ).fetchall()
-            else:
-                result = self.db.execute(
-                    text("""
-                        SELECT * FROM audit_logs 
-                        ORDER BY created_at DESC 
-                        LIMIT :limit
-                    """),
-                    {"limit": limit}
-                ).fetchall()
-
-            logs = []
-            for row in result:
-                log = dict(row._mapping)
-
-                # Парсим details если есть
-                if log.get("details"):
-                    try:
-                        log["details"] = json.loads(log["details"])
-                    except:
-                        pass
-
-                # Форматируем для ответа
-                formatted_log = {
-                    "id": str(log["id"]),
-                    "action": log["action"],
-                    "entity": log["entity"],
-                    "details": log.get("details"),
-                    "createdAt": log["created_at"].isoformat() if hasattr(log["created_at"], 'isoformat') else str(
-                        log["created_at"]),
-                }
-
-                if has_users and log.get("user_name"):
-                    formatted_log["user"] = {
-                        "name": log["user_name"],
-                        "email": log["user_email"]
-                    }
-
-                logs.append(formatted_log)
-
-            return logs
-        except Exception as e:
-            print(f"❌ Ошибка получения всех логов: {e}")
-            return []
+        """Получение всех логов"""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """SELECT a.*, u.name as user_name, u.email as user_email 
+               FROM audit_logs a
+               LEFT JOIN users u ON a.user_id = u.id
+               ORDER BY a.created_at DESC 
+               LIMIT ?""",
+            (limit,)
+        )
+        logs = []
+        for row in cursor.fetchall():
+            log = dict(row)
+            logs.append({
+                "id": str(log["id"]),
+                "action": log["action"],
+                "entity": log["entity"],
+                "details": json.loads(log["details"]) if log["details"] else None,
+                "createdAt": log["created_at"],
+                "user": {
+                    "name": log["user_name"],
+                    "email": log["user_email"]
+                } if log["user_name"] else None
+            })
+        return logs
