@@ -1,155 +1,142 @@
+# services/player_service.py
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
-import re
 
 
 class PlayerService:
     def __init__(self, db: Session):
         self.db = db
 
-    def _convert_height(self, height_str: str) -> Optional[str]:
-        """Конвертирует рост из формата '6-9' в сантиметры"""
-        if not height_str or height_str == '':
-            return None
-
+    def get_all_players(
+            self,
+            team_abbrev: Optional[str] = None,
+            season: Optional[str] = None,
+            search: Optional[str] = None,
+            min_games: int = 5,
+            sort_by: str = 'pts',
+            sort_order: str = 'desc',
+            skip: int = 0,
+            limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Получение всех игроков из таблицы players
+        """
         try:
-            # Формат "6-9" (футы-дюймы)
-            parts = height_str.split('-')
-            if len(parts) == 2:
-                feet = int(parts[0])
-                inches = int(parts[1])
-                total_inches = feet * 12 + inches
-                cm = total_inches * 2.54
-                return f"{round(cm)} cm"
-        except:
-            pass
-
-        return height_str
-
-    def _convert_weight(self, weight_str: str) -> Optional[str]:
-        """Конвертирует вес из фунтов в килограммы"""
-        if not weight_str or weight_str == '':
-            return None
-
-        try:
-            lbs = float(weight_str)
-            kg = round(lbs * 0.453592, 1)
-            return f"{kg} kg"
-        except:
-            return weight_str
-
-    def get_all_players(self, team_id: Optional[int] = None, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
-        """Получение всех игроков"""
-        try:
-            query = """
-                SELECT 
-                    cpi.person_id as id,
-                    cpi.first_name,
-                    cpi.last_name,
-                    cpi.display_first_last as full_name,
-                    cpi.jersey as number,
-                    cpi.position,
-                    cpi.birthdate,
-                    cpi.country,
-                    cpi.team_id,
-                    cpi.team_abbreviation as team_abbrev,
-                    cpi.team_name,
-                    cpi.team_city,
-                    cpi.season_exp as experience,
-                    cpi.from_year,
-                    cpi.to_year,
-                    cpi.school,
-                    cpi.height,
-                    cpi.weight,
-                    -- Статистика из player_stats (последний сезон)
-                    ps.season,
-                    ps.player_height,
-                    ps.player_weight,
-                    ps.games_played,
-                    ps.pts as total_points,
-                    ps.reb as total_rebounds,
-                    ps.ast as total_assists,
-                    ps.minutes as total_minutes,
-                    ps.oreb_pct,
-                    ps.dreb_pct,
-                    ps.usg_pct,
-                    ps.ts_pct,
-                    ps.ast_pct,
-                    ps.net_rating
-                FROM common_player_info cpi
-                LEFT JOIN LATERAL (
-                    SELECT * FROM player_stats ps
-                    WHERE ps.player_id = cpi.person_id::text
-                    ORDER BY ps.season DESC
-                    LIMIT 1
-                ) ps ON true
-                WHERE 1=1
+            # Сначала проверим, какие колонки реально есть в таблице
+            check_query = """
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'players'
             """
-            params = {}
+            columns = self.db.execute(text(check_query)).fetchall()
+            existing_columns = [col[0] for col in columns]
+            print(f"✅ Колонки в таблице players: {existing_columns}")
 
-            if team_id:
-                query += " AND cpi.team_id = :team_id"
-                params["team_id"] = str(team_id)
+            # Определяем, как называется колонка с ID
+            id_column = 'id' if 'id' in existing_columns else 'unnamed_0'
 
-            query += " ORDER BY cpi.last_name, cpi.first_name LIMIT :limit OFFSET :skip"
+            query = f"""
+                SELECT 
+                    {id_column} as id,
+                    player_name,
+                    team_abbreviation,
+                    age,
+                    player_height,
+                    player_weight,
+                    college,
+                    country,
+                    draft_year,
+                    draft_round,
+                    draft_number,
+                    gp as games_played,
+                    pts as points_per_game,
+                    reb as rebounds_per_game,
+                    ast as assists_per_game,
+                    net_rating,
+                    oreb_pct,
+                    dreb_pct,
+                    usg_pct as usage_rate,
+                    ts_pct as true_shooting,
+                    ast_pct as assist_percentage,
+                    season
+                FROM players
+                WHERE gp >= :min_games
+            """
+
+            params = {"min_games": min_games}
+
+            if team_abbrev:
+                query += " AND team_abbreviation = :team_abbrev"
+                params["team_abbrev"] = team_abbrev.upper()
+
+            if season:
+                query += " AND season = :season"
+                params["season"] = season
+
+            if search:
+                query += " AND player_name ILIKE :search"
+                params["search"] = f"%{search}%"
+
+            # Валидация сортировки
+            valid_sort_columns = ['pts', 'reb', 'ast', 'player_name', 'gp', 'season']
+            if sort_by not in valid_sort_columns:
+                sort_by = 'pts'
+
+            sort_direction = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
+
+            query += f" ORDER BY {sort_by} {sort_direction} NULLS LAST"
+            query += " LIMIT :limit OFFSET :skip"
+
             params["limit"] = limit
             params["skip"] = skip
 
+            print(f"🔍 Выполняем запрос players с параметрами: {params}")
             result = self.db.execute(text(query), params).fetchall()
+            print(f"✅ Найдено {len(result)} игроков")
 
             players = []
             for row in result:
                 player_data = dict(row._mapping)
 
-                # Получаем данные
-                games_played = player_data.get("games_played")
-                if games_played is None or games_played == 0:
-                    games_played = 1
-
-                # Рассчитываем средние показатели
-                total_points = player_data.get("total_points") or 0
-                total_rebounds = player_data.get("total_rebounds") or 0
-                total_assists = player_data.get("total_assists") or 0
-                total_minutes = player_data.get("total_minutes") or 0
-
-                points_per_game = round(total_points / games_played, 1)
-                rebounds_per_game = round(total_rebounds / games_played, 1)
-                assists_per_game = round(total_assists / games_played, 1)
-                minutes_per_game = round(total_minutes / games_played, 1)
-
-                # Конвертируем рост и вес
-                height = self._convert_height(player_data.get("height"))
-                weight = self._convert_weight(player_data.get("weight"))
+                # Разбиваем имя на части
+                full_name = player_data.get("player_name", "")
+                name_parts = full_name.split(" ")
+                first_name = name_parts[0] if name_parts else ""
+                last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
 
                 players.append({
-                    "id": int(player_data.get("id", 0)),
-                    "first_name": player_data.get("first_name", ""),
-                    "last_name": player_data.get("last_name", ""),
-                    "full_name": player_data.get("full_name", ""),
-                    "number": player_data.get("number"),
-                    "position": player_data.get("position"),
-                    "height": height or player_data.get("player_height"),
-                    "weight": weight or player_data.get("player_weight"),
-                    "birth_date": player_data.get("birthdate"),
+                    "id": player_data.get("id"),
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "full_name": full_name,
+                    "team_abbrev": player_data.get("team_abbreviation"),
+                    "age": float(player_data.get("age") or 0),
+                    "height": self._format_height(player_data.get("player_height")),
+                    "weight": self._format_weight(player_data.get("player_weight")),
+                    "college": player_data.get("college"),
                     "country": player_data.get("country"),
-                    "team_id": int(player_data.get("team_id")) if player_data.get("team_id") else None,
-                    "team_abbrev": player_data.get("team_abbrev"),
-                    "team_name": player_data.get("team_name"),
-                    "team_city": player_data.get("team_city"),
-                    "experience": player_data.get("experience"),
-                    "from_year": player_data.get("from_year"),
-                    "to_year": player_data.get("to_year"),
-                    "school": player_data.get("school"),
-                    "season": player_data.get("season"),
-                    "points_per_game": points_per_game,
-                    "rebounds_per_game": rebounds_per_game,
-                    "assists_per_game": assists_per_game,
-                    "minutes_per_game": minutes_per_game,
-                    "games_played": games_played if games_played != 1 else None,
-                    "usage_rate": player_data.get("usg_pct"),
-                    "true_shooting": player_data.get("ts_pct"),
-                    "net_rating": player_data.get("net_rating")
+
+                    # Статистика
+                    "games_played": player_data.get("games_played"),
+                    "points_per_game": float(player_data.get("points_per_game") or 0),
+                    "rebounds_per_game": float(player_data.get("rebounds_per_game") or 0),
+                    "assists_per_game": float(player_data.get("assists_per_game") or 0),
+
+                    # Продвинутая статистика
+                    "net_rating": float(player_data.get("net_rating") or 0),
+                    "offensive_rebound_pct": float(player_data.get("oreb_pct") or 0),
+                    "defensive_rebound_pct": float(player_data.get("dreb_pct") or 0),
+                    "usage_rate": float(player_data.get("usage_rate") or 0),
+                    "true_shooting": float(player_data.get("true_shooting") or 0),
+                    "assist_percentage": float(player_data.get("assist_percentage") or 0),
+
+                    # Информация о драфте
+                    "draft_year": player_data.get("draft_year"),
+                    "draft_round": player_data.get("draft_round"),
+                    "draft_number": player_data.get("draft_number"),
+
+                    "season": player_data.get("season")
                 })
 
             return players
@@ -159,3 +146,191 @@ class PlayerService:
             import traceback
             traceback.print_exc()
             return []
+
+    def get_player_by_id(self, player_id: int) -> Optional[Dict[str, Any]]:
+        """Получение игрока по ID"""
+        try:
+            # Сначала проверим, какие колонки реально есть в таблице
+            check_query = """
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'players'
+            """
+            columns = self.db.execute(text(check_query)).fetchall()
+            existing_columns = [col[0] for col in columns]
+
+            # Определяем, как называется колонка с ID
+            id_column = 'id' if 'id' in existing_columns else 'unnamed_0'
+
+            query = f"""
+                SELECT 
+                    {id_column} as id,
+                    player_name,
+                    team_abbreviation,
+                    age,
+                    player_height,
+                    player_weight,
+                    college,
+                    country,
+                    draft_year,
+                    draft_round,
+                    draft_number,
+                    gp as games_played,
+                    pts as points_per_game,
+                    reb as rebounds_per_game,
+                    ast as assists_per_game,
+                    net_rating,
+                    oreb_pct,
+                    dreb_pct,
+                    usg_pct as usage_rate,
+                    ts_pct as true_shooting,
+                    ast_pct as assist_percentage,
+                    season
+                FROM players
+                WHERE {id_column} = :player_id
+            """
+
+            result = self.db.execute(text(query), {"player_id": player_id}).fetchone()
+
+            if not result:
+                return None
+
+            player_data = dict(result._mapping)
+
+            # Разбиваем имя на части
+            full_name = player_data.get("player_name", "")
+            name_parts = full_name.split(" ")
+            first_name = name_parts[0] if name_parts else ""
+            last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+
+            return {
+                "id": player_data.get("id"),
+                "first_name": first_name,
+                "last_name": last_name,
+                "full_name": full_name,
+                "team_abbrev": player_data.get("team_abbreviation"),
+                "age": float(player_data.get("age") or 0),
+                "height": self._format_height(player_data.get("player_height")),
+                "weight": self._format_weight(player_data.get("player_weight")),
+                "college": player_data.get("college"),
+                "country": player_data.get("country"),
+
+                # Статистика
+                "games_played": player_data.get("games_played"),
+                "points_per_game": float(player_data.get("points_per_game") or 0),
+                "rebounds_per_game": float(player_data.get("rebounds_per_game") or 0),
+                "assists_per_game": float(player_data.get("assists_per_game") or 0),
+
+                # Продвинутая статистика
+                "net_rating": float(player_data.get("net_rating") or 0),
+                "offensive_rebound_pct": float(player_data.get("oreb_pct") or 0),
+                "defensive_rebound_pct": float(player_data.get("dreb_pct") or 0),
+                "usage_rate": float(player_data.get("usage_rate") or 0),
+                "true_shooting": float(player_data.get("true_shooting") or 0),
+                "assist_percentage": float(player_data.get("assist_percentage") or 0),
+
+                # Информация о драфте
+                "draft_year": player_data.get("draft_year"),
+                "draft_round": player_data.get("draft_round"),
+                "draft_number": player_data.get("draft_number"),
+
+                "season": player_data.get("season")
+            }
+
+        except Exception as e:
+            print(f"❌ Ошибка получения игрока по ID: {e}")
+            return None
+
+    def get_players_by_team(self, team_abbrev: str) -> List[Dict[str, Any]]:
+        """Получение игроков команды"""
+        return self.get_all_players(team_abbrev=team_abbrev)
+
+    def get_seasons(self) -> List[str]:
+        """Получение списка всех сезонов"""
+        try:
+            result = self.db.execute(
+                text("SELECT DISTINCT season FROM players ORDER BY season DESC")
+            ).fetchall()
+            return [row[0] for row in result]
+        except Exception as e:
+            print(f"❌ Ошибка получения сезонов: {e}")
+            return []
+
+    def get_top_players(
+            self,
+            category: str = 'pts',
+            min_games: int = 10,
+            limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Получение топ-игроков по категории"""
+        valid_categories = ['pts', 'reb', 'ast', 'net_rating']
+        if category not in valid_categories:
+            category = 'pts'
+
+        try:
+            # Сначала проверим, какие колонки реально есть в таблице
+            check_query = """
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'players'
+            """
+            columns = self.db.execute(text(check_query)).fetchall()
+            existing_columns = [col[0] for col in columns]
+
+            # Определяем, как называется колонка с ID
+            id_column = 'id' if 'id' in existing_columns else 'unnamed_0'
+
+            query = f"""
+                SELECT 
+                    {id_column} as id,
+                    player_name,
+                    team_abbreviation,
+                    gp,
+                    {category} as value,
+                    pts,
+                    reb,
+                    ast,
+                    season
+                FROM players
+                WHERE gp >= :min_games
+                ORDER BY {category} DESC NULLS LAST
+                LIMIT :limit
+            """
+
+            result = self.db.execute(
+                text(query),
+                {"min_games": min_games, "limit": limit}
+            ).fetchall()
+
+            players = []
+            for row in result:
+                player_data = dict(row._mapping)
+                players.append({
+                    "id": player_data.get("id"),
+                    "player_name": player_data.get("player_name"),
+                    "team_abbrev": player_data.get("team_abbreviation"),
+                    "games_played": player_data.get("gp"),
+                    "value": float(player_data.get("value") or 0),
+                    "points_per_game": float(player_data.get("pts") or 0),
+                    "rebounds_per_game": float(player_data.get("reb") or 0),
+                    "assists_per_game": float(player_data.get("ast") or 0),
+                    "season": player_data.get("season")
+                })
+
+            return players
+
+        except Exception as e:
+            print(f"❌ Ошибка получения топ-игроков: {e}")
+            return []
+
+    def _format_height(self, height_cm: Optional[float]) -> Optional[str]:
+        """Форматирует рост в сантиметрах"""
+        if not height_cm:
+            return None
+        return f"{int(height_cm)} см"
+
+    def _format_weight(self, weight_kg: Optional[float]) -> Optional[str]:
+        """Форматирует вес в килограммах"""
+        if not weight_kg:
+            return None
+        return f"{int(weight_kg)} кг"

@@ -44,48 +44,44 @@ class TeamBase(BaseModel):
     arena: Optional[str] = None
     founded_year: Optional[int] = None
 
+# schemas.py (только изменения в PlayerBase и PlayerResponse)
 
-# ========== PLAYERS ==========
 class PlayerBase(BaseModel):
-    first_name: str
-    last_name: str
-    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    full_name: str
     number: Optional[str] = None
     position: Optional[str] = None
     height: Optional[str] = None
     weight: Optional[str] = None
     birth_date: Optional[str] = None
     country: Optional[str] = None
-    team_id: Optional[int] = None
     team_abbrev: Optional[str] = None
     team_name: Optional[str] = None
     team_city: Optional[str] = None
-    experience: Optional[float] = None
-    from_year: Optional[float] = None
-    to_year: Optional[float] = None
-    school: Optional[str] = None
-    draft_year: Optional[str] = None
-    draft_round: Optional[str] = None
-    draft_number: Optional[str] = None
 
-    # Статистика (обязательные поля)
+    # Статистика
+    season: Optional[str] = None
     points_per_game: float = 0
     rebounds_per_game: float = 0
     assists_per_game: float = 0
-    minutes_per_game: Optional[float] = 0
-
-    # Дополнительные метрики
+    minutes_per_game: Optional[float] = None
     games_played: Optional[int] = None
+    age: Optional[int] = None
+
+    # Продвинутая статистика
     usage_rate: Optional[float] = None
     true_shooting: Optional[float] = None
     net_rating: Optional[float] = None
+    assist_percentage: Optional[float] = None
+    offensive_rebound_pct: Optional[float] = None
+    defensive_rebound_pct: Optional[float] = None
 
-    # Фото
-    image_url: Optional[str] = None
-
-
-class PlayerCreate(PlayerBase):
-    pass
+    # Информация о драфте
+    draft_year: Optional[str] = None
+    draft_round: Optional[str] = None
+    draft_number: Optional[str] = None
+    college: Optional[str] = None
 
 
 class PlayerResponse(PlayerBase):

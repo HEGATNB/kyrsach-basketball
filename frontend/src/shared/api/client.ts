@@ -58,6 +58,16 @@ export interface Player {
   minutes_per_game?: number;
   image_url?: string;
   team?: Team;
+  games_played?: number;
+  season?: string;
+  college?: string;
+  country?: string;
+  draft_year?: string;
+  draft_round?: string;
+  draft_number?: string;
+  usage_rate?: number;
+  true_shooting?: number;
+  net_rating?: number;
 }
 
 export interface Prediction {
@@ -178,22 +188,41 @@ function normalizeMatch(raw: any): Match {
 function normalizePlayer(raw: any): Player {
   return {
     id: Number(raw?.id || 0),
-    first_name: raw?.firstName || raw?.first_name || '',
-    last_name: raw?.lastName || raw?.last_name || '',
-    number: raw?.jerseyNumber ?? raw?.number ?? undefined,
+    first_name: raw?.first_name || raw?.firstName || '',
+    last_name: raw?.last_name || raw?.lastName || '',
+    number: raw?.number ? Number(raw.number) : undefined,
     position: raw?.position || undefined,
-    team_id: Number(raw?.teamId ?? raw?.team_id ?? 0),
-    height: raw?.height ? `${raw.height} cm` : raw?.height || undefined,
-    weight: raw?.weight ?? undefined,
-    birth_date: raw?.birthDate || raw?.birth_date || undefined,
-    points_per_game: Number(raw?.pointsPerGame ?? raw?.points_per_game ?? 0),
-    rebounds_per_game: Number(raw?.reboundsPerGame ?? raw?.rebounds_per_game ?? 0),
-    assists_per_game: Number(raw?.assistsPerGame ?? raw?.assists_per_game ?? 0),
-    steals_per_game: Number(raw?.stealsPerGame ?? raw?.steals_per_game ?? 0),
-    blocks_per_game: Number(raw?.blocksPerGame ?? raw?.blocks_per_game ?? 0),
-    minutes_per_game: Number(raw?.minutesPerGame ?? raw?.minutes_per_game ?? 0),
-    image_url: raw?.photoUrl || raw?.image_url || undefined,
-    team: raw?.team ? normalizeTeam(raw.team) : undefined,
+    team_id: 0, // У нас нет team_id в новой таблице, но интерфейс требует
+    height: raw?.height ? raw.height : undefined,
+    weight: raw?.weight ? Number(raw.weight) : undefined,
+    birth_date: raw?.birth_date || undefined,
+    points_per_game: Number(raw?.points_per_game || 0),
+    rebounds_per_game: Number(raw?.rebounds_per_game || 0),
+    assists_per_game: Number(raw?.assists_per_game || 0),
+    steals_per_game: Number(raw?.steals_per_game || 0),
+    blocks_per_game: Number(raw?.blocks_per_game || 0),
+    minutes_per_game: Number(raw?.minutes_per_game || 0),
+    image_url: raw?.image_url || undefined,
+    // Добавляем поля из новой таблицы
+    games_played: raw?.games_played,
+    season: raw?.season,
+    college: raw?.college,
+    country: raw?.country,
+    draft_year: raw?.draft_year,
+    draft_round: raw?.draft_round,
+    draft_number: raw?.draft_number,
+    usage_rate: raw?.usage_rate,
+    true_shooting: raw?.true_shooting,
+    net_rating: raw?.net_rating,
+    team: raw?.team_abbrev ? {
+      id: 0,
+      name: raw.team_abbrev,
+      abbrev: raw.team_abbrev,
+      wins: 0,
+      losses: 0,
+      avgPointsFor: 0,
+      avgPointsAgainst: 0
+    } : undefined
   };
 }
 
