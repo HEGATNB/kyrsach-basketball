@@ -2,10 +2,31 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { apiRequest } from '@/shared/api/client';
-import type { Team, Player } from '@/shared/api/client';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
 import { PlayerCard } from '@/shared/ui/PlayerCard';
 import { ArrowLeft, Trophy, MapPin, Users } from 'lucide-react';
+
+interface Team {
+  id: number;
+  name: string;
+  abbrev: string;
+  city: string;
+  wins: number;
+  losses: number;
+  championships?: number;
+  arena?: string;
+  foundedYear?: number;
+  pointsPerGame?: number;
+  pointsAgainst?: number;
+}
+
+interface Player {
+  id: number;
+  first_name: string;
+  last_name: string;
+  position?: string;
+  number?: number;
+}
 
 export const TeamPage = () => {
   const { teamId } = useParams();
@@ -20,13 +41,13 @@ export const TeamPage = () => {
 
   const loadData = async () => {
     try {
-      const [teamData, playersData] = await Promise.all([
-        apiRequest<Team>(`/teams/${teamId}`),
-        apiRequest<Player[]>(`/players?team_id=${teamId}`)
-      ]);
+      const teamData = await apiRequest<Team>(`/teams/${teamId}`);
       setTeam(teamData);
-      setPlayers(playersData);
+
+      // Временно пустой массив для игроков, так как API /players не работает
+      setPlayers([]);
     } catch (err) {
+      console.error('Ошибка загрузки команды:', err);
       setError('Команда не найдена');
     } finally {
       setLoading(false);

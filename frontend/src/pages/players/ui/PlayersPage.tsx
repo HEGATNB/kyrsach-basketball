@@ -10,23 +10,24 @@ export default function PlayersPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    loadPlayers();
+    // Временно используем тестовые данные, так как API /players не работает
+    setTimeout(() => {
+      setPlayers([]);
+      setLoading(false);
+    }, 500);
   }, []);
 
-  const loadPlayers = async () => {
-    try {
-      const data = await apiRequest<any[]>("/players");
-      setPlayers(data);
-    } catch (err) {
-      console.error("Ошибка загрузки игроков:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredPlayers = players.filter(player => 
+  const filteredPlayers = players.filter(player =>
     `${player.first_name} ${player.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -62,27 +63,10 @@ export default function PlayersPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredPlayers.length > 0 ? (
-            filteredPlayers.map((player, index) => (
-              <PlayerCard 
-                key={player.id} 
-                player={player} 
-                delay={index * 0.05} 
-              />
-            ))
-          ) : (
-            <div className="col-span-full py-20 text-center">
-              <p className="text-slate-500 text-lg">Игроки не найдены</p>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="text-center py-20">
+        <p className="text-slate-500 text-lg">API игроков временно недоступно</p>
+        <p className="text-slate-600 text-sm mt-2">Раздел в разработке</p>
+      </div>
     </div>
   );
 }

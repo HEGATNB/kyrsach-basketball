@@ -12,15 +12,43 @@ import {
 } from 'lucide-react';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
 import { apiRequest } from '@/shared/api/client';
-import type { Team, Match, Prediction } from '@/shared/api/client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { 
-  LineChartComponent, 
-  BarChartComponent, 
-  PieChartComponent, 
-  RadarChartComponent 
+import {
+  LineChartComponent,
+  BarChartComponent,
+  PieChartComponent,
+  RadarChartComponent
 } from '@/shared/ui/Charts';
+
+// Типы данных
+interface Team {
+  id: number;
+  name: string;
+  abbrev: string;
+  wins: number;
+  losses: number;
+}
+
+interface Match {
+  id: number;
+  date: string;
+  status: string;
+  home_team: Team;
+  away_team: Team;
+  home_score: number | null;
+  away_score: number | null;
+}
+
+interface Prediction {
+  id: string;
+  probabilityTeam1: number;
+  probabilityTeam2: number;
+  confidence: number;
+  createdAt: string;
+  team1: Team;
+  team2: Team;
+}
 
 export const HomePage = () => {
   const { user } = useAuth();
@@ -30,7 +58,6 @@ export const HomePage = () => {
   const [recentPredictions, setRecentPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiConfidence, setAiConfidence] = useState(0);
-  const [liveScore] = useState({ home: 108, away: 102 });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -49,8 +76,8 @@ export const HomePage = () => {
         apiRequest<Team[]>('/teams'),
         apiRequest<Match[]>('/matches?status=finished&limit=5')
       ]);
-      
-      setTeams(teamsData.slice(0, 3)); // Топ-3 команды для показа
+
+      setTeams(teamsData.slice(0, 3));
       setRecentMatches(matchesData.slice(0, 3));
 
       if (user) {
@@ -180,7 +207,7 @@ export const HomePage = () => {
 
             <div className="flex flex-col items-center px-6">
               <div className="text-6xl font-black font-spacegrotesk text-white mb-2">
-                {liveScore.home} : {liveScore.away}
+                108 : 102
               </div>
               <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden">
                 <motion.div
@@ -250,9 +277,11 @@ export const HomePage = () => {
             <div className="space-y-3">
               {recentMatches.map((match) => (
                 <div key={match.id} className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">{match.home_team?.name || 'Unknown'} vs {match.away_team?.name || 'Unknown'}</span>
+                  <span className="text-sm text-slate-300">
+                    {match.home_team?.name || 'Unknown'} vs {match.away_team?.name || 'Unknown'}
+                  </span>
                   <span className="text-sm font-mono text-orange-400">
-                    {match.homeScore}:{match.awayScore}
+                    {match.home_score}:{match.away_score}
                   </span>
                 </div>
               ))}
@@ -314,74 +343,8 @@ export const HomePage = () => {
           </div>
         </GlowingCard>
       )}
-
-      {/* Графики статистики */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-        <LineChartComponent
-          title="Точность модели по месяцам"
-          data={accuracyData}
-          dataKey="accuracy"
-          xAxisKey="month"
-        />
-        
-        <BarChartComponent
-          title="Активность прогнозов"
-          data={predictionsData}
-          dataKey="count"
-          xAxisKey="day"
-        />
-        
-        <PieChartComponent
-          title="Точность прогнозов"
-          data={pieData}
-          nameKey="name"
-          valueKey="value"
-        />
-        
-        <RadarChartComponent
-          title="Сравнение топ-команд"
-          data={teamComparisonData}
-          dataKeys={['Lakers', 'Celtics', 'Warriors']}
-        />
-      </div>
     </div>
   );
 };
-
-// Данные для графиков
-const accuracyData = [
-  { month: 'Янв', accuracy: 65 },
-  { month: 'Фев', accuracy: 68 },
-  { month: 'Мар', accuracy: 72 },
-  { month: 'Апр', accuracy: 75 },
-  { month: 'Май', accuracy: 79 },
-  { month: 'Июн', accuracy: 82 },
-  { month: 'Июл', accuracy: 84 },
-  { month: 'Авг', accuracy: 86 },
-  { month: 'Сен', accuracy: 87 },
-];
-
-const predictionsData = [
-  { day: 'Пн', count: 12 },
-  { day: 'Вт', count: 18 },
-  { day: 'Ср', count: 15 },
-  { day: 'Чт', count: 24 },
-  { day: 'Пт', count: 32 },
-  { day: 'Сб', count: 45 },
-  { day: 'Вс', count: 38 },
-];
-
-const pieData = [
-  { name: 'Точные', value: 68 },
-  { name: 'Неточные', value: 32 },
-];
-
-const teamComparisonData = [
-  { metric: 'Очки', Lakers: 115, Celtics: 118, Warriors: 122 },
-  { metric: 'Подборы', Lakers: 42, Celtics: 44, Warriors: 43 },
-  { metric: 'Передачи', Lakers: 26, Celtics: 28, Warriors: 29 },
-  { metric: 'Перехваты', Lakers: 7, Celtics: 8, Warriors: 7 },
-  { metric: 'Блоки', Lakers: 5, Celtics: 6, Warriors: 5 },
-];
 
 export default HomePage;

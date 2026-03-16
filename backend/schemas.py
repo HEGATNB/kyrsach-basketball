@@ -2,11 +2,10 @@ from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Optional, List
 
-
-# User schemas
 class UserBase(BaseModel):
     email: EmailStr
-    name: str
+    name: Optional[str] = None
+    username: Optional[str] = None
     role: Optional[str] = "user"
 
 
@@ -15,7 +14,8 @@ class UserCreate(UserBase):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    # Может быть email или username
+    identifier: str
     password: str
 
 
@@ -33,7 +33,6 @@ class TokenResponse(BaseModel):
     token_type: str
     user: UserResponse
 
-
 # Team schemas
 class TeamBase(BaseModel):
     name: str
@@ -45,6 +44,55 @@ class TeamBase(BaseModel):
     arena: Optional[str] = None
     founded_year: Optional[int] = None
 
+
+# ========== PLAYERS ==========
+class PlayerBase(BaseModel):
+    first_name: str
+    last_name: str
+    full_name: Optional[str] = None
+    number: Optional[str] = None
+    position: Optional[str] = None
+    height: Optional[str] = None
+    weight: Optional[str] = None
+    birth_date: Optional[str] = None
+    country: Optional[str] = None
+    team_id: Optional[int] = None
+    team_abbrev: Optional[str] = None
+    team_name: Optional[str] = None
+    team_city: Optional[str] = None
+    experience: Optional[float] = None
+    from_year: Optional[float] = None
+    to_year: Optional[float] = None
+    school: Optional[str] = None
+    draft_year: Optional[str] = None
+    draft_round: Optional[str] = None
+    draft_number: Optional[str] = None
+
+    # Статистика (обязательные поля)
+    points_per_game: float = 0
+    rebounds_per_game: float = 0
+    assists_per_game: float = 0
+    minutes_per_game: Optional[float] = 0
+
+    # Дополнительные метрики
+    games_played: Optional[int] = None
+    usage_rate: Optional[float] = None
+    true_shooting: Optional[float] = None
+    net_rating: Optional[float] = None
+
+    # Фото
+    image_url: Optional[str] = None
+
+
+class PlayerCreate(PlayerBase):
+    pass
+
+
+class PlayerResponse(PlayerBase):
+    id: int
+
+    class Config:
+        from_attributes = True
 
 class TeamCreate(TeamBase):
     conference_id: Optional[int] = None

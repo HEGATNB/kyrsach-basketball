@@ -9,35 +9,45 @@ interface Match {
   id: number;
   date: string;
   status: string;
-  homeTeam: { 
-    id: number; 
-    name: string; 
-    abbrev: string 
+  home_team: {
+    id: number;
+    name: string;
+    abbrev: string;
   };
-  awayTeam: { 
-    id: number; 
-    name: string; 
-    abbrev: string 
+  away_team: {
+    id: number;
+    name: string;
+    abbrev: string;
   };
-  homeScore: number | null;
-  awayScore: number | null;
+  home_score: number | null;
+  away_score: number | null;
 }
 
 export const MatchPage = () => {
-  const { matchId } = useParams();
+  const { matchId } = useParams<{ matchId: string }>(); // Явно указываем тип
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('📌 MatchPage mounted, matchId from URL:', matchId);
+
+    if (!matchId || matchId === 'undefined') {
+      console.error('❌ Invalid matchId:', matchId);
+      setLoading(false);
+      return;
+    }
+
     loadMatch();
   }, [matchId]);
 
   const loadMatch = async () => {
     try {
+      console.log(`📡 Fetching match with ID: ${matchId}`);
       const data = await apiRequest<Match>(`/matches/${matchId}`);
+      console.log('✅ Match data received:', data);
       setMatch(data);
     } catch (err) {
-      console.error('Ошибка загрузки матча:', err);
+      console.error('❌ Error loading match:', err);
     } finally {
       setLoading(false);
     }
@@ -54,7 +64,8 @@ export const MatchPage = () => {
   if (!match) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-400">Матч не найден</p>
+        <p className="text-red-400 mb-4">Матч не найден</p>
+        <p className="text-slate-500 text-sm mb-8">ID матча: {matchId || 'не указан'}</p>
         <Link to="/matches" className="text-orange-400 hover:text-orange-300 mt-4 inline-block">
           ← Назад к матчам
         </Link>
@@ -77,7 +88,7 @@ export const MatchPage = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">
-              {match.homeTeam.name} vs {match.awayTeam.name}
+              {match.home_team?.name || 'Unknown'} vs {match.away_team?.name || 'Unknown'}
             </h1>
             <div className="flex items-center gap-4 text-slate-400">
               <span className="flex items-center gap-1">
@@ -85,8 +96,8 @@ export const MatchPage = () => {
                 {new Date(match.date).toLocaleDateString()}
               </span>
               <span className={`px-3 py-1 rounded-full text-xs ${
-                match.status === 'finished' 
-                  ? 'bg-green-500/20 text-green-400' 
+                match.status === 'finished'
+                  ? 'bg-green-500/20 text-green-400'
                   : 'bg-yellow-500/20 text-yellow-400'
               }`}>
                 {match.status === 'finished' ? 'Завершен' : 'Ожидается'}
@@ -98,14 +109,14 @@ export const MatchPage = () => {
         <div className="flex items-center justify-between py-8">
           <div className="text-center flex-1">
             <div className="w-32 h-32 mx-auto bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mb-4">
-              <span className="text-4xl font-bold text-white">{match.homeTeam.abbrev}</span>
+              <span className="text-4xl font-bold text-white">{match.home_team?.abbrev || '???'}</span>
             </div>
-            <h2 className="text-xl font-bold text-white">{match.homeTeam.name}</h2>
+            <h2 className="text-xl font-bold text-white">{match.home_team?.name || 'Unknown'}</h2>
           </div>
 
-          {match.status === 'finished' && match.homeScore !== null ? (
+          {match.status === 'finished' && match.home_score !== null ? (
             <div className="text-5xl font-bold text-white px-8">
-              {match.homeScore} : {match.awayScore}
+              {match.home_score} : {match.away_score}
             </div>
           ) : (
             <div className="text-2xl text-slate-500 px-8">VS</div>
@@ -113,15 +124,15 @@ export const MatchPage = () => {
 
           <div className="text-center flex-1">
             <div className="w-32 h-32 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-4">
-              <span className="text-4xl font-bold text-white">{match.awayTeam.abbrev}</span>
+              <span className="text-4xl font-bold text-white">{match.away_team?.abbrev || '???'}</span>
             </div>
-            <h2 className="text-xl font-bold text-white">{match.awayTeam.name}</h2>
+            <h2 className="text-xl font-bold text-white">{match.away_team?.name || 'Unknown'}</h2>
           </div>
         </div>
 
         <div className="mt-8 flex justify-center">
           <Link
-            to={`/prediction/new?team1=${match.homeTeam.id}&team2=${match.awayTeam.id}`}
+            to={`/prediction/new?team1=${match.home_team?.id}&team2=${match.away_team?.id}`}
             className="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"
           >
             Сделать прогноз на этот матч

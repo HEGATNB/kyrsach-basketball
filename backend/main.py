@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Optional
 
 # Импортируем контроллеры из папки controllers
-from controllers import auth, teams, matches, predictions
+from controllers import auth, teams, matches, predictions, players
 
 # Импортируем функции из скриптов
 from scripts.update_data import update_db_with_new_games
@@ -246,12 +246,14 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(predictions.router, prefix="/api", tags=["predictions"])
+app.include_router(players.router, prefix="/api/players", tags=["players"])
 
 # Дублируем роуты без /api для обратной совместимости
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/teams", tags=["teams"])
 app.include_router(matches.router, prefix="/matches", tags=["matches"])
 app.include_router(predictions.router, prefix="", tags=["predictions"])
+app.include_router(players.router, prefix="/players", tags=["players"])
 
 
 # ========== КОРНЕВОЙ ЭНДПОИНТ ==========
@@ -290,6 +292,11 @@ async def root():
                 "by_id": "GET /api/predictions/{id} or /predictions/{id}",
                 "evaluate": "GET /api/predict/evaluate or /predict/evaluate",
                 "stats": "GET /api/predict/stats or /predict/stats"
+            },
+            "players": {
+                "all": "GET /api/players or /players",
+                "by_id": "GET /api/players/{id} or /players/{id}",
+                "by_team": "GET /api/players/team/{team_id} or /players/team/{team_id}"
             }
         },
         "docs": "/docs"
