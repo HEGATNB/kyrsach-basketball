@@ -1,3 +1,4 @@
+// shared/ui/PlayerCard.tsx
 import { ArrowUpRight } from 'lucide-react';
 import { GlowingCard } from './GlowingCard';
 import { TeamMark } from './TeamMark';
@@ -30,11 +31,29 @@ interface PlayerCardProps {
   onOpenDetails?: () => void;
 }
 
+// Функция для получения ссылки на фото игрока с basketball-reference.com
+function getPlayerImageUrl(player: PlayerCardProps['player']): string {
+  if (player.image_url) return player.image_url;
+  
+  // Формируем URL для basketball-reference.com
+  // Пример: https://www.basketball-reference.com/req/202503171/images/players/lebroja01.jpg
+  const firstName = player.first_name.toLowerCase();
+  const lastName = player.last_name.toLowerCase();
+  
+  // Берем первые 5 букв фамилии и первые 2 буквы имени
+  const lastNamePart = lastName.substring(0, 5);
+  const firstNamePart = firstName.substring(0, 2);
+  
+  return `https://www.basketball-reference.com/req/202503171/images/players/${lastNamePart}${firstNamePart}01.jpg`;
+}
+
 export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: PlayerCardProps) {
   const teamBrand = getTeamBrand({ abbrev: player.team?.abbrev, name: player.team?.name });
   const brandColor = player.team?.brandColor || teamBrand.brandColor;
   const accentColor = player.team?.accentColor || teamBrand.accentColor;
   const fallbackImage = player.team?.logoUrl || teamBrand.logoUrl;
+  const playerImageUrl = getPlayerImageUrl(player);
+  
   const heroStyle = {
     background: `linear-gradient(145deg, ${hexToRgba(brandColor, 0.22)}, ${hexToRgba(accentColor, 0.08)} 64%, rgba(7,9,12,0.92) 100%)`,
     borderColor: hexToRgba(brandColor, 0.26),
@@ -64,12 +83,13 @@ export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: Player
         <div className="mt-5 flex items-end gap-4">
           <div className="h-28 w-24 shrink-0 overflow-hidden rounded-[14px] border border-white/10 bg-black/20">
             <img
-              src={player.image_url || fallbackImage}
+              src={playerImageUrl}
               alt={`${player.first_name} ${player.last_name}`}
               className="h-full w-full object-cover object-top"
               loading="lazy"
               decoding="async"
               onError={(event) => {
+                // Если фото игрока не загрузилось, показываем логотип команды
                 (event.target as HTMLImageElement).src = fallbackImage;
               }}
             />

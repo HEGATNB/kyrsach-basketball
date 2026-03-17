@@ -8,7 +8,7 @@ import { hexToRgba } from '@/shared/lib/teamBrand';
 
 type PlayersView = 'cards' | 'board';
 
-const PLAYER_IMAGE_FALLBACK = 'https://www.nba.com/assets/logos/teams/primary/web/NBA.svg';
+const PLAYER_IMAGE_FALLBACK = 'https://www.basketball-reference.com/req/202503171/images/players/';
 
 function formatFullName(player: Player) {
   return `${player.first_name} ${player.last_name}`.trim();
@@ -45,7 +45,9 @@ function getPlayerSummary(player: Player) {
 }
 
 function getPlayerFallbackImage(player: Player) {
-  return player.team?.logoUrl || PLAYER_IMAGE_FALLBACK;
+  if (player.team?.logoUrl) return player.team.logoUrl;
+
+  return 'https://www.basketball-reference.com/req/202503171/images/league/NBA_logo.png';
 }
 
 function getPlayerStrengths(player: Player) {

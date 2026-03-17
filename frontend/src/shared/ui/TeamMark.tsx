@@ -1,3 +1,4 @@
+// shared/ui/TeamMark.tsx
 import { useEffect, useState, type CSSProperties } from 'react';
 import type { Team } from '@/shared/api/client';
 import { getTeamBrand, hexToRgba } from '@/shared/lib/teamBrand';
@@ -30,12 +31,22 @@ function getFallbackCode(team?: Pick<Team, 'name' | 'abbrev'> | null) {
   return initials;
 }
 
+// Функция для получения ссылки на логотип команды с basketball-reference.com
+function getTeamLogoUrl(team?: Pick<Team, 'abbrev'> | null): string | null {
+  if (!team?.abbrev) return null;
+  
+  // Basketball-reference использует трехбуквенные аббревиатуры
+  const abbrev = team.abbrev.toUpperCase();
+  return `https://www.basketball-reference.com/req/202503171/images/teams/${abbrev}.jpg`;
+}
+
 export function TeamMark({ team, size = 'md', className = '' }: TeamMarkProps) {
   const [broken, setBroken] = useState(false);
   const brand = getTeamBrand({ abbrev: team?.abbrev, name: team?.name });
   const brandColor = team?.brandColor || brand.brandColor;
   const accentColor = team?.accentColor || brand.accentColor;
-  const logoUrl = team?.logoUrl || brand.logoUrl;
+  const logoUrl = team?.logoUrl || getTeamLogoUrl(team) || brand.logoUrl;
+  
   const style: CSSProperties = {
     borderColor: hexToRgba(brandColor, 0.28),
     background: `linear-gradient(145deg, ${hexToRgba(brandColor, 0.18)}, ${hexToRgba(accentColor, 0.12)})`,
