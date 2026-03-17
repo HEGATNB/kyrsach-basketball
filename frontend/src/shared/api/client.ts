@@ -174,14 +174,34 @@ function normalizeTeam(raw: any): Team {
 }
 
 function normalizeMatch(raw: any): Match {
+  let dateStr = raw?.date || new Date().toISOString();
+
+  try {
+    // Если дата в формате "1946-11-01 00:00:00", конвертируем в ISO
+    if (typeof dateStr === 'string' && dateStr.includes(' ') && !dateStr.includes('T')) {
+      const [datePart, timePart] = dateStr.split(' ');
+      dateStr = `${datePart}T${timePart}Z`;
+    }
+  } catch (e) {
+    console.warn('Error parsing date:', dateStr);
+  }
+
   return {
     id: Number(raw?.id || 0),
-    date: raw?.date || new Date().toISOString(),
+    date: dateStr,
     status: raw?.status || 'scheduled',
-    homeTeam: normalizeTeam(raw?.homeTeam),
-    awayTeam: normalizeTeam(raw?.awayTeam),
-    homeScore: raw?.homeScore ?? null,
-    awayScore: raw?.awayScore ?? null,
+    homeTeam: normalizeTeam(raw?.homeTeam || {
+      id: raw?.home_team_id,
+      name: raw?.home_team?.name || raw?.home_team_name,
+      abbrev: raw?.home_team?.abbrev || raw?.home_team_abbrev
+    }),
+    awayTeam: normalizeTeam(raw?.awayTeam || {
+      id: raw?.away_team_id,
+      name: raw?.away_team?.name || raw?.away_team_name,
+      abbrev: raw?.away_team?.abbrev || raw?.away_team_abbrev
+    }),
+    homeScore: raw?.home_score ?? null,
+    awayScore: raw?.away_score ?? null,
   };
 }
 

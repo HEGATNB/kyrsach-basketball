@@ -1,3 +1,4 @@
+# controllers/matches.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -14,41 +15,69 @@ router = APIRouter()
 
 @router.get("/", response_model=List[schemas.MatchResponse])
 async def get_all_matches(
-        status: Optional[str] = Query(None, description="Фильтр по статусу"),
-        team_id: Optional[int] = Query(None, description="Фильтр по команде"),
-        skip: int = 0,
-        limit: int = 100,
+        status: Optional[str] = Query(None, description="Фильтр по статусу (finished/scheduled)"),
+        team_id: Optional[int] = Query(None, description="Фильтр по ID команды"),
+        skip: int = Query(0, ge=0, description="Сколько пропустить"),
+        limit: int = Query(100, ge=1, le=1000, description="Сколько вернуть"),
         db: Session = Depends(get_db)
 ):
     """Получение списка матчей с фильтрацией"""
-    match_service = MatchService(db)
+    try:
+        match_service = MatchService(db)
 
-    filters = {}
-    if status:
-        filters["status"] = status
+        filters = {}
+        if status:
+            if status not in ["finished", "scheduled"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Статус должен быть 'finished' или 'scheduled'"
+                )
+            filters["status"] = status
 
-    matches = match_service.get_all_matches(filters, skip=skip, limit=limit)
+        matches = match_service.get_all_matches(filters, skip=skip, limit=limit)
 
-    # Фильтрация по команде
-    if team_id:
-        matches = [m for m in matches if m["home_team_id"] == team_id or m["away_team_id"] == team_id]
+        # Фильтрация по команде
+        if team_id:
+            matches = [m for m in matches if m["home_team_id"] == team_id or m["away_team_id"] == team_id]
 
-    return matches
+        return matches
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка в get_all_matches: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера"
+        )
 
 
 @router.get("/{match_id}", response_model=schemas.MatchResponse)
-async def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
+async def get_match_by_id(
+        match_id: int,
+        db: Session = Depends(get_db)
+):
     """Получение матча по ID"""
-    match_service = MatchService(db)
-    match = match_service.get_match_by_id(match_id)
+    try:
+        match_service = MatchService(db)
+        match = match_service.get_match_by_id(match_id)
 
-    if not match:
+        if not match:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Матч с ID {match_id} не найден"
+            )
+
+        return match
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка в get_match_by_id: {e}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Матч с ID {match_id} не найден"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера"
         )
-
-    return match
 
 
 @router.post("/", response_model=schemas.MatchResponse, status_code=status.HTTP_201_CREATED)
