@@ -7,19 +7,16 @@ import bcrypt  # Прямой импорт bcrypt вместо passlib
 
 load_dotenv()
 
-# Конфигурация
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
 JWT_EXPIRES_IN = os.getenv("JWT_EXPIRES_IN", "7d")
 
 def get_password_hash(password: str) -> str:
-    """Хеширование пароля с помощью bcrypt"""
     # Преобразуем пароль в байты и хешируем
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Проверка пароля с помощью bcrypt"""
     try:
         return bcrypt.checkpw(
             plain_password.encode('utf-8'),

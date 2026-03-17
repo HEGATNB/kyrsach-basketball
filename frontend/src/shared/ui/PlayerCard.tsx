@@ -34,9 +34,7 @@ interface PlayerCardProps {
 // Функция для получения ссылки на фото игрока с basketball-reference.com
 function getPlayerImageUrl(player: PlayerCardProps['player']): string {
   if (player.image_url) return player.image_url;
-  
-  // Формируем URL для basketball-reference.com
-  // Пример: https://www.basketball-reference.com/req/202503171/images/players/lebroja01.jpg
+
   const firstName = player.first_name.toLowerCase();
   const lastName = player.last_name.toLowerCase();
   
