@@ -1,10 +1,13 @@
+# predictions.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
-import json
+from datetime import datetime
 
 from database import get_db
-from services import ai_service, team_service, audit_service, match_service
+from services.ai_service import AIService
+from services.team_service import TeamService
+from services.audit_service import AuditService
 from middleware.auth import get_current_user, require_admin
 import schemas
 
@@ -17,7 +20,7 @@ async def predict(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Создание прогноза на матч"""
+    """Создание прогноза на матч (требует авторизации)"""
     # Проверка авторизации
     user_data = await get_current_user(request)
     if not user_data:
@@ -26,9 +29,9 @@ async def predict(
             detail="Не авторизован"
         )
 
-    ai_svc = ai_service.AIService(db)
-    team_svc = team_service.TeamService(db)
-    audit_svc = audit_service.AuditService(db)
+    ai_svc = AIService(db)
+    team_svc = TeamService(db)
+    audit_svc = AuditService(db)
 
     # Проверка существования команд
     team1 = team_svc.get_team_by_id(prediction_data.team1_id)
@@ -55,6 +58,8 @@ async def predict(
         )
     except Exception as e:
         print(f"❌ AI prediction error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при создании прогноза: {str(e)}"
@@ -67,8 +72,8 @@ async def predict(
         entity="Prediction",
         entity_id=int(prediction["id"]),
         details={
-            "team1": team1["name"],
-            "team2": team2["name"],
+            "team1": team1.get("name") or team1.get("full_name"),
+            "team2": team2.get("name") or team2.get("full_name"),
             "probability": prediction.get("probabilityTeam1"),
             "confidence": prediction.get("confidence")
         },
@@ -78,6 +83,40 @@ async def predict(
     return prediction
 
 
+@router.get("/predict/stats")
+async def get_model_stats(
+        request: Request,
+        db: Session = Depends(get_db)
+):
+    """Получение статистики модели (публичный эндпоинт)"""
+    # Делаем публичным - не требует авторизации
+    ai_svc = AIService(db)
+    stats = await ai_svc.get_model_stats()
+    return stats
+
+
+@router.get("/predict/evaluate")
+async def evaluate_model(
+        request: Request,
+        db: Session = Depends(get_db)
+):
+    """Оценка точности модели (публичный эндпоинт)"""
+    # Делаем публичным - не требует авторизации
+    ai_svc = AIService(db)
+    accuracy = await ai_svc.evaluate_model()
+
+    if accuracy is None:
+        return {
+            "accuracy": None,
+            "message": "Недостаточно данных для оценки модели"
+        }
+
+    return {
+        "accuracy": round(accuracy * 100, 1),
+        "message": f"Точность модели: {accuracy * 100:.1f}%"
+    }
+
+
 @router.get("/predictions/my", response_model=List[schemas.PredictionResponse])
 async def get_my_predictions(
         request: Request,
@@ -85,7 +124,7 @@ async def get_my_predictions(
         limit: int = 50,
         db: Session = Depends(get_db)
 ):
-    """Получение истории прогнозов текущего пользователя"""
+    """Получение истории прогнозов текущего пользователя (требует авторизации)"""
     user_data = await get_current_user(request)
     if not user_data:
         raise HTTPException(
@@ -93,7 +132,7 @@ async def get_my_predictions(
             detail="Не авторизован"
         )
 
-    ai_svc = ai_service.AIService(db)
+    ai_svc = AIService(db)
     predictions = await ai_svc.get_user_predictions(
         user_data.user_id,
         skip=skip,
@@ -108,7 +147,7 @@ async def get_prediction_by_id(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение прогноза по ID"""
+    """Получение прогноза по ID (требует авторизации)"""
     user_data = await get_current_user(request)
     if not user_data:
         raise HTTPException(
@@ -116,7 +155,7 @@ async def get_prediction_by_id(
             detail="Не авторизован"
         )
 
-    ai_svc = ai_service.AIService(db)
+    ai_svc = AIService(db)
     prediction = await ai_svc.get_prediction_by_id(prediction_id)
 
     if not prediction:
@@ -142,18 +181,13 @@ async def train_on_match(
         db: Session = Depends(get_db)
 ):
     """Обучение модели на реальном результате матча (только для админов)"""
-    user_data = await get_current_user(request)
-    if not user_data or user_data.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуются права администратора"
-        )
+    user_data = await require_admin(request)
 
-    ai_svc = ai_service.AIService(db)
-    match_svc = match_service.MatchService(db)
-    audit_svc = audit_service.AuditService(db)
+    ai_svc = AIService(db)
+    audit_svc = AuditService(db)
 
-    # Проверка существования матча
+    from services.match_service import MatchService
+    match_svc = MatchService(db)
     match = match_svc.get_match_by_id(match_id)
 
     if not match:
@@ -168,7 +202,6 @@ async def train_on_match(
             detail="Матч еще не завершен или не имеет результата"
         )
 
-    # Обучение модели
     result = await ai_svc.train_on_actual_result(match)
 
     audit_svc.log(
@@ -184,49 +217,3 @@ async def train_on_match(
         "message": "Модель успешно обучена на реальном результате",
         "result": result
     }
-
-
-@router.get("/predict/evaluate")
-async def evaluate_model(
-        request: Request,
-        db: Session = Depends(get_db)
-):
-    """Оценка точности модели"""
-    user_data = await get_current_user(request)
-    if not user_data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Не авторизован"
-        )
-
-    ai_svc = ai_service.AIService(db)
-    accuracy = await ai_svc.evaluate_model()
-
-    if accuracy is None:
-        return {
-            "accuracy": None,
-            "message": "Недостаточно данных для оценки модели"
-        }
-
-    return {
-        "accuracy": round(accuracy * 100, 2),
-        "message": f"Точность модели: {accuracy * 100:.2f}%"
-    }
-
-
-@router.get("/predict/stats")
-async def get_model_stats(
-        request: Request,
-        db: Session = Depends(get_db)
-):
-    """Получение статистики модели"""
-    user_data = await get_current_user(request)
-    if not user_data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Не авторизован"
-        )
-
-    ai_svc = ai_service.AIService(db)
-    stats = await ai_svc.get_model_stats()
-    return stats

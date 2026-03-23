@@ -400,18 +400,29 @@ class AIService:
     async def _get_team_info(self, team_id: int) -> Optional[Dict]:
         """Получение информации о команде из PostgreSQL"""
         try:
-            # Сначала пробуем получить из таблицы team
-            result = self.db.execute(
+            # Проверяем наличие таблицы team
+            check_table = self.db.execute(
                 text("""
-                    SELECT id, full_name as name, abbreviation as abbrev
-                    FROM team 
-                    WHERE id = :team_id
-                """),
-                {"team_id": team_id}
-            ).fetchone()
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = 'team'
+                    )
+                """)
+            ).scalar()
 
-            if result:
-                return dict(result._mapping)
+            if check_table:
+                # Пробуем получить из таблицы team
+                result = self.db.execute(
+                    text("""
+                        SELECT id, full_name as name, abbreviation as abbrev
+                        FROM team 
+                        WHERE id = :team_id
+                    """),
+                    {"team_id": team_id}
+                ).fetchone()
+
+                if result:
+                    return dict(result._mapping)
 
             # Если нет в team, пробуем получить из game
             result = self.db.execute(

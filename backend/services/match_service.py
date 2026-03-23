@@ -9,10 +9,11 @@ class MatchService:
     def __init__(self, db: Session):
         self.db = db
 
+    # services/match_service.py - исправленная генерация ID
+
     def get_all_matches(self, filters: Dict = None, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
         """Получение всех матчей"""
         try:
-            # Используем данные напрямую из таблицы game
             query = """
                 SELECT 
                     g.season_id,
@@ -49,53 +50,58 @@ class MatchService:
             params["limit"] = limit
             params["skip"] = skip
 
-            print(f"🔍 Выполняем запрос матчей с параметрами: {params}")
             result = self.db.execute(text(query), params).fetchall()
-            print(f"✅ Найдено {len(result)} матчей")
 
             matches = []
+            # Используем set для отслеживания использованных ID
+            used_ids = set()
+
             for row in result:
                 game = dict(row._mapping)
 
-                # Определяем статус
                 has_score = game.get("pts_home") is not None and game.get("pts_away") is not None
                 status = "finished" if has_score else "scheduled"
 
-                # Форматируем дату из текстового поля
                 game_date = game.get("game_date")
                 date_str = None
 
                 if game_date:
-                    try:
-                        # Пробуем разные форматы даты
-                        if 'T' in game_date:
-                            # ISO формат
-                            date_obj = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
-                        elif ' ' in game_date:
-                            # Формат "1946-11-01 00:00:00"
-                            date_obj = datetime.strptime(game_date, "%Y-%m-%d %H:%M:%S")
-                        else:
-                            # Только дата
-                            date_obj = datetime.strptime(game_date, "%Y-%m-%d")
+                    if isinstance(game_date, datetime):
+                        date_str = game_date.isoformat()
+                    elif isinstance(game_date, str):
+                        try:
+                            if ' ' in game_date:
+                                date_obj = datetime.strptime(game_date, "%Y-%m-%d %H:%M:%S")
+                            else:
+                                date_obj = datetime.fromisoformat(game_date)
+                            date_str = date_obj.isoformat()
+                        except:
+                            date_str = game_date
 
-                        # Конвертируем в ISO формат для фронтенда
-                        date_str = date_obj.isoformat()
-                    except Exception as e:
-                        print(f"⚠️ Ошибка парсинга даты '{game_date}': {e}")
-                        date_str = game_date
+                # Генерируем уникальный ID на основе game_id и season_id
+                game_id_val = game.get("game_id")
+                season_id_val = game.get("season_id")
 
-                # Генерируем уникальный ID для матча
-                # Используем game_id так как он уникальный
-                try:
-                    match_id = int(str(game.get('game_id')).replace('-', '')[:8])
-                except:
-                    match_id = abs(hash(f"{game.get('game_id')}_{game.get('season_id')}")) % (10 ** 8)
+                # Создаем уникальный ключ
+                unique_key = f"{game_id_val}_{season_id_val}"
+                # Генерируем числовой ID из уникального ключа
+                match_id = abs(hash(unique_key)) % (10 ** 8)
 
-                # Получаем названия команд
-                home_team_name = game.get("home_team_name", "Unknown Team")
-                away_team_name = game.get("away_team_name", "Unknown Team")
-                home_team_abbrev = game.get("home_team_abbrev", "???")
-                away_team_abbrev = game.get("away_team_abbrev", "???")
+                # Если ID уже использован, добавляем счетчик
+                original_id = match_id
+                counter = 1
+                while match_id in used_ids:
+                    match_id = (original_id + counter) % (10 ** 8)
+                    counter += 1
+                used_ids.add(match_id)
+
+                home_team_name = game.get("home_team_name")
+                away_team_name = game.get("away_team_name")
+
+                if not home_team_name:
+                    home_team_name = game.get("home_team_abbrev", f"Team {game.get('team_id_home')}")
+                if not away_team_name:
+                    away_team_name = game.get("away_team_abbrev", f"Team {game.get('team_id_away')}")
 
                 match = {
                     "id": match_id,
@@ -107,12 +113,12 @@ class MatchService:
                     "home_team": {
                         "id": int(float(game.get("team_id_home"))) if game.get("team_id_home") else 0,
                         "name": home_team_name,
-                        "abbrev": home_team_abbrev
+                        "abbrev": game.get("home_team_abbrev", f"T{game.get('team_id_home')}")
                     },
                     "away_team": {
                         "id": int(float(game.get("team_id_away"))) if game.get("team_id_away") else 0,
                         "name": away_team_name,
-                        "abbrev": away_team_abbrev
+                        "abbrev": game.get("away_team_abbrev", f"T{game.get('team_id_away')}")
                     },
                     "home_score": int(float(game.get("pts_home"))) if game.get("pts_home") is not None else None,
                     "away_score": int(float(game.get("pts_away"))) if game.get("pts_away") is not None else None,

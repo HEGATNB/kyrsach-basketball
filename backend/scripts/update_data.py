@@ -1,4 +1,6 @@
-import sqlite3
+# update_data.py
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -6,20 +8,29 @@ import sys
 import io
 import requests
 import json
+import os
+from dotenv import load_dotenv
 
 # Исправляем проблемы с кодировкой в Windows
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-DB_PATH = "../nba.sqlite"
+load_dotenv()
+
+# Используем параметры из .env
+DB_NAME = os.getenv("DB_NAME", "nba")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "12345678")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
 
 # Расширенный маппинг названий команд из ESPN в аббревиатуры БД
 TEAM_NAME_MAP = {
     # Обычные команды с учётом ваших аббревиатур
     'Atlanta Hawks': 'ATL',
     'Boston Celtics': 'BOS',
-    'Brooklyn Nets': 'BKN',  # Изменено с BRK на BKN
-    'Charlotte Hornets': 'CHA',  # Изменено с CHO на CHA
+    'Brooklyn Nets': 'BKN',
+    'Charlotte Hornets': 'CHA',
     'Chicago Bulls': 'CHI',
     'Cleveland Cavaliers': 'CLE',
     'Dallas Mavericks': 'DAL',
@@ -40,7 +51,7 @@ TEAM_NAME_MAP = {
     'Oklahoma City Thunder': 'OKC',
     'Orlando Magic': 'ORL',
     'Philadelphia 76ers': 'PHI',
-    'Phoenix Suns': 'PHX',  # Изменено с PHO на PHX
+    'Phoenix Suns': 'PHX',
     'Portland Trail Blazers': 'POR',
     'Sacramento Kings': 'SAC',
     'San Antonio Spurs': 'SAS',
@@ -70,15 +81,34 @@ TEAM_NAME_MAP = {
 SPECIAL_GAME_KEYWORDS = ['Team', 'World', 'USA', 'All-Star', 'All Star', 'Rising Stars', 'Celebrity']
 
 
+def get_db_connection():
+    """Создает подключение к PostgreSQL"""
+    conn = psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        cursor_factory=RealDictCursor
+    )
+    return conn
+
+
 def get_team_id_map(conn):
     """Создаёт словарь {team_abbreviation: team_id} из таблицы game."""
-    df = pd.read_sql_query(
-        "SELECT DISTINCT team_abbreviation_home as abbrev, team_id_home as team_id FROM game "
-        "UNION "
-        "SELECT DISTINCT team_abbreviation_away as abbrev, team_id_away as team_id FROM game",
-        conn
-    )
-    team_map = dict(zip(df['abbrev'], df['team_id']))
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT team_abbreviation_home as abbrev, team_id_home as team_id 
+        FROM game 
+        WHERE team_id_home IS NOT NULL
+        UNION
+        SELECT DISTINCT team_abbreviation_away as abbrev, team_id_away as team_id 
+        FROM game 
+        WHERE team_id_away IS NOT NULL
+    """)
+    rows = cursor.fetchall()
+    team_map = {row['abbrev']: row['team_id'] for row in rows}
+    cursor.close()
 
     # Добавляем заглушку для специальных игр
     team_map['ALL'] = 0
@@ -173,10 +203,6 @@ def fetch_detailed_stats(game_id):
                 for key, value in stat.items():
                     if isinstance(value, (int, float)) and key != 'label':
                         target[key] = value
-
-        # Если получили статистику, выведем её для отладки
-        if result['home']:
-            print(f"    📊 Got detailed stats: {list(result['home'].keys())[:5]}...")
 
         return result
 
@@ -343,37 +369,56 @@ def parse_espn_game(event, team_id_map):
         return None
 
 
+def game_exists(conn, game_id):
+    """Проверяет, существует ли уже игра в БД"""
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM game WHERE game_id = %s", (game_id,))
+    exists = cursor.fetchone() is not None
+    cursor.close()
+    return exists
+
+
 def insert_game(conn, game):
     """Вставляет запись в таблицу game."""
     cursor = conn.cursor()
 
+    # Проверяем, существует ли уже игра
+    if game_exists(conn, game['game_id']):
+        print(f"    ⏭️ Game {game['game_id']} already exists")
+        return False
+
+    # Формируем запрос
     columns = ', '.join(game.keys())
-    placeholders = ':' + ', :'.join(game.keys())
-    query = f"INSERT OR IGNORE INTO game ({columns}) VALUES ({placeholders})"
+    placeholders = ', '.join(['%s'] * len(game))
+    query = f"INSERT INTO game ({columns}) VALUES ({placeholders})"
 
     try:
-        cursor.execute(query, game)
+        cursor.execute(query, list(game.values()))
         conn.commit()
         return True
     except Exception as e:
         print(f"    ❌ Error inserting game: {e}")
+        conn.rollback()
         return False
+    finally:
+        cursor.close()
 
 
-def update_db_with_new_games(db_path, days_back=7):
+def update_db_with_new_games(db_path=None, days_back=7):
     """
     Обновляет базу новыми играми через ESPN API.
+    Параметр db_path оставлен для совместимости, не используется
     """
     print(f"\n{'=' * 60}")
     print(f"🔄 Updating database with games from last {days_back} days using ESPN API")
     print(f"{'=' * 60}")
 
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection()
     team_id_map = get_team_id_map(conn)
     today = datetime.now().date()
     new_count = 0
     failed_count = 0
-    special_count = 0
+    skipped_count = 0
 
     for i in range(days_back):
         date = today - timedelta(days=i)
@@ -390,7 +435,7 @@ def update_db_with_new_games(db_path, days_back=7):
                 new_count += 1
                 print(f"    ✅ Added: {game_record['team_abbreviation_away']} @ {game_record['team_abbreviation_home']}")
             else:
-                failed_count += 1
+                skipped_count += 1
 
             # Задержка между запросами
             time.sleep(1)
@@ -406,11 +451,11 @@ def update_db_with_new_games(db_path, days_back=7):
     print(f"📊 Summary:")
     print(f"  • Games added: {new_count}")
     print(f"  • Failed to add: {failed_count}")
-    print(f"  • Special games skipped: {special_count}")
+    print(f"  • Skipped (already exist): {skipped_count}")
     print(f"{'=' * 60}")
 
     return new_count
 
 
 if __name__ == "__main__":
-    update_db_with_new_games(DB_PATH, days_back=7)
+    update_db_with_new_games(days_back=7)
