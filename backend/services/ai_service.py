@@ -164,91 +164,103 @@ class AIService:
             "modelVersion": "model-v1"
         }
 
-    async def _predict_statistical(self, team1_id: int, team2_id: int, user_id: int, team1: Dict, team2: Dict) -> Dict[
+    async def _predict_statistical(self, team1_id: str, team2_id: str, user_id: int, team1: Dict, team2: Dict) -> Dict[
         str, Any]:
-        """Статистический метод предсказания на основе реальных данных"""
-        # Получаем статистику команд за последний сезон
-        team1_stats = self.get_team_stats_by_season(team1_id)
-        team2_stats = self.get_team_stats_by_season(team2_id)
+        """Статистический метод предсказания"""
+        try:
+            # Получаем статистику команд
+            team1_stats = self.get_team_stats_by_season(team1_id)
+            team2_stats = self.get_team_stats_by_season(team2_id)
 
-        # Получаем историю матчей
-        team1_history = self._get_team_history(team1_id, 20)
-        team2_history = self._get_team_history(team2_id, 20)
-        head_to_head = self._get_head_to_head(team1_id, team2_id, 10)
+            # Получаем историю матчей
+            team1_history = self._get_team_history(team1_id, 20)
+            team2_history = self._get_team_history(team2_id, 20)
+            head_to_head = self._get_head_to_head(team1_id, team2_id, 10)
 
-        # Рассчитываем факторы
-        team1_win_rate = self._calculate_win_rate(team1_id, team1_history)
-        team2_win_rate = self._calculate_win_rate(team2_id, team2_history)
+            # Рассчитываем факторы
+            team1_win_rate = self._calculate_win_rate(team1_id, team1_history)
+            team2_win_rate = self._calculate_win_rate(team2_id, team2_history)
 
-        # Фактор преимущества дома (фиксированный для team1 как хозяев)
-        home_advantage = 0.55
+            # Фактор преимущества дома
+            home_advantage = 0.55
 
-        # Фактор личных встреч
-        head_to_head_factor = self._calculate_head_to_head_factor(head_to_head, team1_id) if head_to_head else 0.5
+            # Фактор личных встреч
+            head_to_head_factor = self._calculate_head_to_head_factor(head_to_head, team1_id) if head_to_head else 0.5
 
-        # Фактор формы (последние 5 игр)
-        team1_form = self._calculate_recent_form(team1_id, team1_history[:5])
-        team2_form = self._calculate_recent_form(team2_id, team2_history[:5])
-        form_factor = team1_form / (team1_form + team2_form) if (team1_form + team2_form) > 0 else 0.5
+            # Фактор формы
+            team1_form = self._calculate_recent_form(team1_id, team1_history[:5])
+            team2_form = self._calculate_recent_form(team2_id, team2_history[:5])
+            form_factor = team1_form / (team1_form + team2_form) if (team1_form + team2_form) > 0 else 0.5
 
-        # Фактор силы атаки/защиты
-        if team1_stats and team2_stats:
-            offensive_factor = team1_stats.get('pts_pg', 110) / (
-                        team1_stats.get('pts_pg', 110) + team2_stats.get('opp_pts_pg', 110))
-            defensive_factor = team2_stats.get('opp_pts_pg', 110) / (
-                        team1_stats.get('opp_pts_pg', 110) + team2_stats.get('opp_pts_pg', 110))
-            strength_factor = (offensive_factor + defensive_factor) / 2
-        else:
-            strength_factor = 0.5
+            # Фактор силы
+            if team1_stats and team2_stats:
+                offensive_factor = team1_stats.get('pts_pg', 110) / (
+                            team1_stats.get('pts_pg', 110) + team2_stats.get('opp_pts_pg', 110))
+                defensive_factor = team2_stats.get('opp_pts_pg', 110) / (
+                            team1_stats.get('opp_pts_pg', 110) + team2_stats.get('opp_pts_pg', 110))
+                strength_factor = (offensive_factor + defensive_factor) / 2
+            else:
+                strength_factor = 0.5
 
-        # Общая вероятность
-        prob1 = (
-                        team1_win_rate * 0.3 +
-                        home_advantage * 0.2 +
-                        head_to_head_factor * 0.15 +
-                        form_factor * 0.2 +
-                        strength_factor * 0.15
-                ) * 100
+            # Общая вероятность
+            prob1 = (
+                            team1_win_rate * 0.3 +
+                            home_advantage * 0.2 +
+                            head_to_head_factor * 0.15 +
+                            form_factor * 0.2 +
+                            strength_factor * 0.15
+                    ) * 100
 
-        prob2 = 100 - prob1
-        confidence = 70 + min(20, abs(prob1 - 50) / 2)
+            prob2 = 100 - prob1
+            confidence = 70 + min(20, abs(prob1 - 50) / 2)
 
-        # Предсказание счета на основе статистики
-        if team1_stats and team2_stats:
-            score1 = int(team1_stats.get('pts_pg', 110) * (prob1 / 100))
-            score2 = int(team2_stats.get('pts_pg', 110) * (prob2 / 100))
-        else:
-            score1 = int(110 * prob1 / 100)
-            score2 = int(110 * prob2 / 100)
+            # Предсказание счета
+            if team1_stats and team2_stats:
+                score1 = int(team1_stats.get('pts_pg', 110) * (prob1 / 100))
+                score2 = int(team2_stats.get('pts_pg', 110) * (prob2 / 100))
+            else:
+                score1 = int(110 * prob1 / 100)
+                score2 = int(110 * prob2 / 100)
 
-        # Сохраняем предсказание
-        prediction_id = await self._save_prediction(
-            user_id, team1_id, team2_id, prob1, prob2, score1, score2,
-            confidence, "statistical-v1", None
-        )
+            # Сохраняем предсказание
+            prediction_id = await self._save_prediction(
+                user_id, team1_id, team2_id, prob1, prob2, score1, score2,
+                confidence, "statistical-v1", None
+            )
 
-        return {
-            "id": str(prediction_id),
-            "probabilityTeam1": round(prob1, 1),
-            "probabilityTeam2": round(prob2, 1),
-            "expectedScoreTeam1": score1,
-            "expectedScoreTeam2": score2,
-            "confidence": round(confidence, 1),
-            "team1Id": team1_id,
-            "team2Id": team2_id,
-            "team1": team1,
-            "team2": team2,
-            "createdAt": datetime.now().isoformat(),
-            "modelVersion": "statistical-v1"
-        }
+            return {
+                "id": str(prediction_id),
+                "probabilityTeam1": round(prob1, 1),
+                "probabilityTeam2": round(prob2, 1),
+                "expectedScoreTeam1": score1,
+                "expectedScoreTeam2": score2,
+                "confidence": round(confidence, 1),
+                "team1Id": int(team1_id),
+                "team2Id": int(team2_id),
+                "team1": team1,  # team1 уже содержит только id, name, abbrev
+                "team2": team2,  # team2 уже содержит только id, name, abbrev
+                "createdAt": datetime.now().isoformat(),
+                "modelVersion": "statistical-v1"
+            }
 
-    def get_team_stats_by_season(self, team_id: int, season_id: str = None):
-        """Получение статистики команды за сезон"""
+        except Exception as e:
+            print(f"❌ Ошибка в статистическом предсказании: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def get_team_stats_by_season(self, team_id: str, season_id: str = None):
         try:
             query = """
-                SELECT *
-                FROM team_info_common
-                WHERE team_id = :team_id
+                SELECT 
+                    AVG(CAST(pts_home AS FLOAT)) as pts_pg,
+                    AVG(CAST(pts_away AS FLOAT)) as opp_pts_pg,
+                    COUNT(*) as games_played,
+                    SUM(CASE WHEN wl_home = 'W' THEN 1 ELSE 0 END) as wins
+                FROM game 
+                WHERE team_id_home = :team_id
+                AND pts_home IS NOT NULL
+                AND pts_home > 0
             """
             params = {"team_id": team_id}
 
@@ -256,23 +268,37 @@ class AIService:
                 query += " AND season_id = :season_id"
                 params["season_id"] = season_id
             else:
-                query += " ORDER BY season_id DESC LIMIT 1"
+                query += " ORDER BY game_date DESC LIMIT 30"
 
             result = self.db.execute(text(query), params).fetchone()
 
-            if result:
-                return dict(result._mapping)
+            if result and result.pts_pg:
+                return {
+                    "pts_pg": float(result.pts_pg),
+                    "opp_pts_pg": float(result.opp_pts_pg) if result.opp_pts_pg else 110.0,
+                    "games_played": int(result.games_played),
+                    "wins": int(result.wins) if result.wins else 0
+                }
         except Exception as e:
-            print(f"❌ Ошибка получения статистики команды: {e}")
+            print(f"❌ Ошибка получения статистики команды {team_id}: {e}")
 
         return None
 
-    def _get_team_history(self, team_id: int, limit: int = 100):
-        """История матчей команды из PostgreSQL"""
+    def _get_team_history(self, team_id: str, limit: int = 100):
         try:
             result = self.db.execute(
                 text("""
-                    SELECT * FROM game 
+                    SELECT 
+                        team_id_home,
+                        team_id_away,
+                        team_name_home,
+                        team_name_away,
+                        wl_home,
+                        wl_away,
+                        pts_home,
+                        pts_away,
+                        game_date
+                    FROM game 
                     WHERE (team_id_home = :team_id OR team_id_away = :team_id)
                     AND pts_home IS NOT NULL
                     ORDER BY game_date DESC 
@@ -283,22 +309,31 @@ class AIService:
 
             return [dict(row._mapping) for row in result]
         except Exception as e:
-            print(f"❌ Ошибка получения истории команды: {e}")
+            print(f"❌ Ошибка получения истории команды {team_id}: {e}")
             return []
 
-    def _get_head_to_head(self, team1_id: int, team2_id: int, limit: int = 20):
-        """История личных встреч из PostgreSQL"""
+    def _get_head_to_head(self, team1_id: str, team2_id: str, limit: int = 20):
         try:
             result = self.db.execute(
                 text("""
-                    SELECT * FROM game 
-                    WHERE ((team_id_home = :team1_id AND team_id_away = :team2_id) 
-                       OR (team_id_home = :team2_id AND team_id_away = :team1_id))
+                    SELECT 
+                        team_id_home,
+                        team_id_away,
+                        team_name_home,
+                        team_name_away,
+                        wl_home,
+                        wl_away,
+                        pts_home,
+                        pts_away,
+                        game_date
+                    FROM game 
+                    WHERE ((team_id_home = :team1 AND team_id_away = :team2) 
+                       OR (team_id_home = :team2 AND team_id_away = :team1))
                     AND pts_home IS NOT NULL
                     ORDER BY game_date DESC 
                     LIMIT :limit
                 """),
-                {"team1_id": team1_id, "team2_id": team2_id, "limit": limit}
+                {"team1": team1_id, "team2": team2_id, "limit": limit}
             ).fetchall()
 
             return [dict(row._mapping) for row in result]
@@ -307,7 +342,6 @@ class AIService:
             return []
 
     def _calculate_win_rate(self, team_id: int, history: List[Dict]) -> float:
-        """Win rate по истории"""
         if not history:
             return 0.5
 
@@ -322,39 +356,33 @@ class AIService:
 
         return wins / len(history)
 
-    def _calculate_recent_form(self, team_id: int, recent_matches: List[Dict]) -> float:
-        """Форма команды в последних матчах"""
+    def _calculate_recent_form(self, team_id: str, recent_matches: List[Dict]) -> float:
         if not recent_matches:
             return 0.5
 
         total_score = 0
         for i, match in enumerate(recent_matches):
             weight = 1.0 - (i * 0.1)  # Более новые матчи имеют больший вес
-            if match["team_id_home"] == team_id:
+            if match.get("team_id_home") == team_id:
                 if match.get("wl_home") == "W":
                     total_score += 1.0 * weight
-                else:
-                    total_score += 0.0 * weight
-            else:
+            elif match.get("team_id_away") == team_id:
                 if match.get("wl_away") == "W":
                     total_score += 1.0 * weight
-                else:
-                    total_score += 0.0 * weight
 
         max_possible = sum([1.0 - (i * 0.1) for i in range(len(recent_matches))])
         return total_score / max_possible if max_possible > 0 else 0.5
 
-    def _calculate_head_to_head_factor(self, head_to_head: List[Dict], team1_id: int) -> float:
-        """Фактор личных встреч"""
+    def _calculate_head_to_head_factor(self, head_to_head: List[Dict], team1_id: str) -> float:
         if not head_to_head:
             return 0.5
 
         team1_wins = 0
         for match in head_to_head:
-            if match["team_id_home"] == team1_id:
+            if match.get("team_id_home") == team1_id:
                 if match.get("wl_home") == "W":
                     team1_wins += 1
-            elif match["team_id_away"] == team1_id:
+            elif match.get("team_id_away") == team1_id:
                 if match.get("wl_away") == "W":
                     team1_wins += 1
 
@@ -363,7 +391,6 @@ class AIService:
     async def _save_prediction(self, user_id: int, team1_id: int, team2_id: int,
                                prob1: float, prob2: float, score1: int, score2: int,
                                confidence: float, model_version: str, features: Dict = None) -> int:
-        """Сохранение предсказания в PostgreSQL"""
         try:
             features_json = json.dumps(features) if features else None
 
@@ -397,75 +424,52 @@ class AIService:
             self.db.rollback()
             return 0
 
-    async def _get_team_info(self, team_id: int) -> Optional[Dict]:
-        """Получение информации о команде из PostgreSQL"""
+    async def _get_team_info(self, team_id) -> Optional[Dict]:
         try:
-            # Проверяем наличие таблицы team
-            check_table = self.db.execute(
-                text("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'team'
-                    )
-                """)
-            ).scalar()
+            team_id_str = str(team_id)
+            print(f"🔍 Поиск команды с ID: '{team_id_str}'")
 
-            if check_table:
-                # Пробуем получить из таблицы team
-                result = self.db.execute(
-                    text("""
-                        SELECT id, full_name as name, abbreviation as abbrev
-                        FROM team 
-                        WHERE id = :team_id
-                    """),
-                    {"team_id": team_id}
-                ).fetchone()
-
-                if result:
-                    return dict(result._mapping)
-
-            # Если нет в team, пробуем получить из game
             result = self.db.execute(
                 text("""
                     SELECT 
-                        CASE 
-                            WHEN team_id_home = :team_id THEN team_id_home
-                            ELSE team_id_away
-                        END as id,
-                        CASE 
-                            WHEN team_id_home = :team_id THEN team_name_home
-                            ELSE team_name_away
-                        END as name,
-                        CASE 
-                            WHEN team_id_home = :team_id THEN team_abbreviation_home
-                            ELSE team_abbreviation_away
-                        END as abbrev
-                    FROM game 
-                    WHERE team_id_home = :team_id OR team_id_away = :team_id 
-                    LIMIT 1
+                        id,
+                        full_name as name,
+                        abbreviation as abbrev
+                    FROM team 
+                    WHERE id = :team_id
                 """),
-                {"team_id": team_id}
+                {"team_id": team_id_str}
             ).fetchone()
 
             if result:
-                return dict(result._mapping)
+                print(f"✅ Найдена: {result.name}")
+                return {
+                    "id": result.id,
+                    "name": result.name,
+                    "abbrev": result.abbrev
+                }
+            else:
+                print(f"❌ Команда с ID '{team_id_str}' не найдена")
+                return None
 
         except Exception as e:
-            print(f"❌ Ошибка получения информации о команде: {e}")
-
-        return None
+            print(f"❌ Ошибка получения информации о команде {team_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     async def get_user_predictions(self, user_id: int, skip: int = 0, limit: int = 50):
-        """Получение прогнозов пользователя из PostgreSQL"""
         try:
             result = self.db.execute(
                 text("""
                     SELECT p.*, 
-                           t1.full_name as team1_name, t1.abbreviation as team1_abbrev,
-                           t2.full_name as team2_name, t2.abbreviation as team2_abbrev
+                           t1.full_name as team1_name, 
+                           t1.abbreviation as team1_abbrev,
+                           t2.full_name as team2_name, 
+                           t2.abbreviation as team2_abbrev
                     FROM predictions p
-                    LEFT JOIN team t1 ON p.team1_id = t1.id
-                    LEFT JOIN team t2 ON p.team2_id = t2.id
+                    LEFT JOIN team t1 ON p.team1_id::text = t1.id::text
+                    LEFT JOIN team t2 ON p.team2_id::text = t2.id::text
                     WHERE p.user_id = :user_id 
                     ORDER BY p.created_at DESC 
                     LIMIT :limit OFFSET :skip
@@ -477,7 +481,6 @@ class AIService:
             for row in result:
                 pred = dict(row._mapping)
 
-                # Форматируем для ответа
                 predictions.append({
                     "id": str(pred["id"]),
                     "probabilityTeam1": pred["probability_team1"],
@@ -503,58 +506,88 @@ class AIService:
             return predictions
         except Exception as e:
             print(f"❌ Ошибка получения прогнозов пользователя: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     async def get_prediction_by_id(self, prediction_id: int):
-        """Получение прогноза по ID из PostgreSQL"""
         try:
+            print(f"🔍 Получение прогноза ID: {prediction_id}")
+
             result = self.db.execute(
                 text("""
-                    SELECT p.*, 
-                           t1.full_name as team1_name, t1.abbreviation as team1_abbrev,
-                           t2.full_name as team2_name, t2.abbreviation as team2_abbrev
+                    SELECT 
+                        p.id,
+                        p.user_id,
+                        p.team1_id,
+                        p.team2_id,
+                        p.probability_team1,
+                        p.probability_team2,
+                        p.expected_score_team1,
+                        p.expected_score_team2,
+                        p.confidence,
+                        p.model_version,
+                        p.created_at,
+                        t1.full_name as team1_name,
+                        t1.abbreviation as team1_abbrev,
+                        t2.full_name as team2_name,
+                        t2.abbreviation as team2_abbrev
                     FROM predictions p
-                    LEFT JOIN team t1 ON p.team1_id = t1.id
-                    LEFT JOIN team t2 ON p.team2_id = t2.id
+                    LEFT JOIN team t1 ON CAST(p.team1_id AS TEXT) = t1.id
+                    LEFT JOIN team t2 ON CAST(p.team2_id AS TEXT) = t2.id
                     WHERE p.id = :id
                 """),
                 {"id": prediction_id}
             ).fetchone()
 
             if result:
-                pred = dict(result._mapping)
-                return {
-                    "id": str(pred["id"]),
-                    "probabilityTeam1": pred["probability_team1"],
-                    "probabilityTeam2": pred["probability_team2"],
-                    "expectedScoreTeam1": pred["expected_score_team1"],
-                    "expectedScoreTeam2": pred["expected_score_team2"],
-                    "confidence": pred["confidence"],
-                    "createdAt": pred["created_at"].isoformat() if pred["created_at"] else None,
-                    "team1Id": pred["team1_id"],
-                    "team2Id": pred["team2_id"],
+                print(f"✅ Прогноз найден: ID={result.id}")
+
+                prob1 = float(result.probability_team1)
+                prob2 = float(result.probability_team2)
+                confidence = float(result.confidence)
+
+                prob1_rounded = round(prob1, 1)
+                prob2_rounded = round(prob2, 1)
+                confidence_rounded = round(confidence, 1)
+
+                response = {
+                    "id": str(result.id),
+                    "probabilityTeam1": prob1_rounded,
+                    "probabilityTeam2": prob2_rounded,
+                    "expectedScoreTeam1": int(result.expected_score_team1),
+                    "expectedScoreTeam2": int(result.expected_score_team2),
+                    "confidence": confidence_rounded,
+                    "createdAt": result.created_at.isoformat() if result.created_at else None,
+                    "team1Id": int(result.team1_id) if result.team1_id.isdigit() else result.team1_id,
+                    "team2Id": int(result.team2_id) if result.team2_id.isdigit() else result.team2_id,
                     "team1": {
-                        "id": pred["team1_id"],
-                        "name": pred["team1_name"] or f"Team {pred['team1_id']}",
-                        "abbrev": pred["team1_abbrev"] or f"T{pred['team1_id']}"
+                        "id": int(result.team1_id) if result.team1_id.isdigit() else result.team1_id,
+                        "name": result.team1_name or f"Team {result.team1_id}",
+                        "abbrev": result.team1_abbrev or f"T{result.team1_id}"
                     },
                     "team2": {
-                        "id": pred["team2_id"],
-                        "name": pred["team2_name"] or f"Team {pred['team2_id']}",
-                        "abbrev": pred["team2_abbrev"] or f"T{pred['team2_id']}"
+                        "id": int(result.team2_id) if result.team2_id.isdigit() else result.team2_id,
+                        "name": result.team2_name or f"Team {result.team2_id}",
+                        "abbrev": result.team2_abbrev or f"T{result.team2_id}"
                     },
-                    "user_id": pred["user_id"],
-                    "model_version": pred["model_version"]
+                    "modelVersion": result.model_version or "statistical-v1"
                 }
+
+                print(f"📤 Отправка ответа: {response}")
+                return response
+
+            print(f"❌ Прогноз с ID {prediction_id} не найден")
             return None
+
         except Exception as e:
-            print(f"❌ Ошибка получения прогноза по ID: {e}")
+            print(f"❌ Ошибка получения прогноза по ID {prediction_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     async def evaluate_model(self) -> Optional[float]:
-        """Оценка точности модели на реальных данных"""
         try:
-            # Получаем завершенные матчи и сравниваем с прогнозами
             result = self.db.execute(
                 text("""
                     SELECT 
@@ -565,7 +598,8 @@ class AIService:
                             THEN 1 ELSE 0 
                         END) as correct
                     FROM predictions p
-                    JOIN game g ON (p.team1_id = g.team_id_home AND p.team2_id = g.team_id_away)
+                    JOIN game g ON (CAST(p.team1_id AS TEXT) = g.team_id_home 
+                                AND CAST(p.team2_id AS TEXT) = g.team_id_away)
                     WHERE g.wl_home IS NOT NULL
                 """)
             ).fetchone()

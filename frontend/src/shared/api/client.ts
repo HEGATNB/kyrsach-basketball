@@ -177,7 +177,6 @@ function normalizeMatch(raw: any): Match {
   let dateStr = raw?.date || new Date().toISOString();
 
   try {
-    // Если дата в формате "1946-11-01 00:00:00", конвертируем в ISO
     if (typeof dateStr === 'string' && dateStr.includes(' ') && !dateStr.includes('T')) {
       const [datePart, timePart] = dateStr.split(' ');
       dateStr = `${datePart}T${timePart}Z`;
@@ -212,7 +211,7 @@ function normalizePlayer(raw: any): Player {
     last_name: raw?.last_name || raw?.lastName || '',
     number: raw?.number ? Number(raw.number) : undefined,
     position: raw?.position || undefined,
-    team_id: 0, // У нас нет team_id в новой таблице, но интерфейс требует
+    team_id: 0,
     height: raw?.height ? raw.height : undefined,
     weight: raw?.weight ? Number(raw.weight) : undefined,
     birth_date: raw?.birth_date || undefined,
@@ -223,7 +222,6 @@ function normalizePlayer(raw: any): Player {
     blocks_per_game: Number(raw?.blocks_per_game || 0),
     minutes_per_game: Number(raw?.minutes_per_game || 0),
     image_url: raw?.image_url || undefined,
-    // Добавляем поля из новой таблицы
     games_played: raw?.games_played,
     season: raw?.season,
     college: raw?.college,
@@ -384,6 +382,11 @@ export async function requestJson<T>(endpoint: string, options?: RequestInit, us
   const parsed = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      // Токен истек - очищаем
+      localStorage.removeItem(TOKEN_KEY);
+      throw new Error('Session expired. Please login again.');
+    }
     throw new Error(parsed?.error || parsed?.message || `HTTP ${response.status}`);
   }
 

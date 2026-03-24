@@ -13,7 +13,6 @@ from scripts.auth import generate_token, TokenPayload
 router = APIRouter()
 
 
-# Временная модель для логина, которая принимает любые поля
 class LoginRequest:
     def __init__(self, email: str, password: str, identifier: Optional[str] = None):
         self.email = email
@@ -21,6 +20,7 @@ class LoginRequest:
         self.identifier = identifier
 
 
+# controllers/auth.py
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(
         request: Request,
@@ -54,7 +54,6 @@ async def login(
             user = service.authenticate_user(identifier, password)
         else:
             # Пробуем найти по имени пользователя (username)
-            # В вашей таблице есть поле username
             from sqlalchemy import text
             result = db.execute(
                 text("SELECT id, email, name, username, role, password_hash, is_blocked, created_at FROM users WHERE username = :username OR name = :name"),
@@ -121,11 +120,12 @@ async def login(
             created_at=user.get("created_at", datetime.utcnow())
         )
 
-        return schemas.TokenResponse(
-            access_token=token,
-            token_type="bearer",
-            user=user_response
-        )
+        # Возвращаем токен в поле "token" как ожидает фронтенд
+        return {
+            "token": token,
+            "token_type": "bearer",
+            "user": user_response
+        }
 
     except HTTPException:
         raise

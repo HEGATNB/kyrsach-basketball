@@ -14,6 +14,7 @@ import schemas
 router = APIRouter()
 
 
+# controllers/predictions.py
 @router.post("/predict", response_model=schemas.PredictionResponse)
 async def predict(
         prediction_data: schemas.PredictionRequest,
@@ -21,66 +22,97 @@ async def predict(
         db: Session = Depends(get_db)
 ):
     """Создание прогноза на матч (требует авторизации)"""
-    # Проверка авторизации
-    user_data = await get_current_user(request)
-    if not user_data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Не авторизован"
-        )
-
-    ai_svc = AIService(db)
-    team_svc = TeamService(db)
-    audit_svc = AuditService(db)
-
-    # Проверка существования команд
-    team1 = team_svc.get_team_by_id(prediction_data.team1_id)
-    team2 = team_svc.get_team_by_id(prediction_data.team2_id)
-
-    if not team1 or not team2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Одна из команд не найдена"
-        )
-
-    if prediction_data.team1_id == prediction_data.team2_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Команды должны быть разными"
-        )
-
-    # Получение предсказания
     try:
-        prediction = await ai_svc.predict_match(
-            prediction_data.team1_id,
-            prediction_data.team2_id,
-            user_data.user_id
+        print("=" * 60)
+        print("🔮 НАЧАЛО ПРЕДСКАЗАНИЯ")
+        print(f"📥 Получены данные: team1_id={prediction_data.team1_id}, team2_id={prediction_data.team2_id}")
+
+        # Проверка авторизации
+        user_data = await get_current_user(request)
+        if not user_data:
+            print("❌ Пользователь не авторизован")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Не авторизован"
+            )
+        print(f"✅ Пользователь авторизован: ID={user_data.user_id}, Role={user_data.role}")
+
+        ai_svc = AIService(db)
+        team_svc = TeamService(db)
+        audit_svc = AuditService(db)
+
+        # Проверка существования команд
+        print(f"🔍 Поиск команды 1: {prediction_data.team1_id}")
+        team1 = team_svc.get_team_by_id(prediction_data.team1_id)
+        print(f"   Результат: {team1}")
+
+        print(f"🔍 Поиск команды 2: {prediction_data.team2_id}")
+        team2 = team_svc.get_team_by_id(prediction_data.team2_id)
+        print(f"   Результат: {team2}")
+
+        if not team1 or not team2:
+            print(f"❌ Команды не найдены: team1={team1 is not None}, team2={team2 is not None}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Одна из команд не найдена: {prediction_data.team1_id} или {prediction_data.team2_id}"
+            )
+
+        if prediction_data.team1_id == prediction_data.team2_id:
+            print("❌ Команды одинаковые")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Команды должны быть разными"
+            )
+
+        # Получение предсказания
+        print("🤖 Вызов AI предсказания...")
+        try:
+            prediction = await ai_svc.predict_match(
+                prediction_data.team1_id,
+                prediction_data.team2_id,
+                user_data.user_id
+            )
+            print(f"✅ Предсказание получено: ID={prediction['id']}")
+            print(f"   Вероятности: {prediction['probabilityTeam1']}% / {prediction['probabilityTeam2']}%")
+        except Exception as e:
+            print(f"❌ AI prediction error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при создании прогноза: {str(e)}"
+            )
+
+        # Логирование
+        print("📝 Логирование действия...")
+        audit_svc.log(
+            user_id=user_data.user_id,
+            action="PREDICT",
+            entity="Prediction",
+            entity_id=int(prediction["id"]),
+            details={
+                "team1": team1.get("name") or team1.get("full_name"),
+                "team2": team2.get("name") or team2.get("full_name"),
+                "probability": prediction.get("probabilityTeam1"),
+                "confidence": prediction.get("confidence")
+            },
+            ip_address=request.client.host if request.client else None
         )
+
+        print("✅ ПРЕДСКАЗАНИЕ УСПЕШНО ЗАВЕРШЕНО")
+        print("=" * 60)
+        return prediction
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"❌ AI prediction error: {e}")
+        print(f"❌ Необработанная ошибка в predict: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при создании прогноза: {str(e)}"
+            detail=f"Внутренняя ошибка сервера: {str(e)}"
         )
-
-    # Логирование
-    audit_svc.log(
-        user_id=user_data.user_id,
-        action="PREDICT",
-        entity="Prediction",
-        entity_id=int(prediction["id"]),
-        details={
-            "team1": team1.get("name") or team1.get("full_name"),
-            "team2": team2.get("name") or team2.get("full_name"),
-            "probability": prediction.get("probabilityTeam1"),
-            "confidence": prediction.get("confidence")
-        },
-        ip_address=request.client.host if request.client else None
-    )
-
-    return prediction
 
 
 @router.get("/predict/stats")
@@ -88,8 +120,6 @@ async def get_model_stats(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение статистики модели (публичный эндпоинт)"""
-    # Делаем публичным - не требует авторизации
     ai_svc = AIService(db)
     stats = await ai_svc.get_model_stats()
     return stats
@@ -100,8 +130,7 @@ async def evaluate_model(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Оценка точности модели (публичный эндпоинт)"""
-    # Делаем публичным - не требует авторизации
+
     ai_svc = AIService(db)
     accuracy = await ai_svc.evaluate_model()
 

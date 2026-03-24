@@ -59,7 +59,6 @@ print(f"  DB_HOST: {DB_HOST}")
 print(f"  DB_PORT: {DB_PORT}")
 print(f"📁 Модели будут сохраняться в: {MODEL_DIR}")
 
-# ... остальной код без изменений ...
 
 if not all([DB_NAME, DB_USER, DB_PASSWORD]):
     print("\n❌ ОШИБКА: Не все параметры БД заданы!")
@@ -134,7 +133,6 @@ def safe_parse_date(date_str):
 
 
 def load_games():
-    """Load game table from PostgreSQL."""
     conn = get_db_connection()
 
     # Загружаем данные, явно указывая колонки

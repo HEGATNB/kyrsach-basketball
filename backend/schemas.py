@@ -29,11 +29,15 @@ class UserResponse(UserBase):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
+    token: str
+    token_type: str = "bearer"
     user: UserResponse
 
-# Team schemas
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
 class TeamBase(BaseModel):
     name: str
     abbrev: str = Field(..., min_length=2, max_length=3)
