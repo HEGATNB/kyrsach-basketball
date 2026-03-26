@@ -462,14 +462,25 @@ class AIService:
         try:
             result = self.db.execute(
                 text("""
-                    SELECT p.*, 
-                           t1.full_name as team1_name, 
-                           t1.abbreviation as team1_abbrev,
-                           t2.full_name as team2_name, 
-                           t2.abbreviation as team2_abbrev
+                    SELECT 
+                        p.id,
+                        p.user_id,
+                        p.team1_id::text as team1_id,
+                        p.team2_id::text as team2_id,
+                        p.probability_team1,
+                        p.probability_team2,
+                        p.expected_score_team1,
+                        p.expected_score_team2,
+                        p.confidence,
+                        p.model_version,
+                        p.created_at,
+                        t1.full_name as team1_name, 
+                        t1.abbreviation as team1_abbrev,
+                        t2.full_name as team2_name, 
+                        t2.abbreviation as team2_abbrev
                     FROM predictions p
-                    LEFT JOIN team t1 ON p.team1_id::text = t1.id::text
-                    LEFT JOIN team t2 ON p.team2_id::text = t2.id::text
+                    LEFT JOIN team t1 ON p.team1_id::text = t1.id
+                    LEFT JOIN team t2 ON p.team2_id::text = t2.id
                     WHERE p.user_id = :user_id 
                     ORDER BY p.created_at DESC 
                     LIMIT :limit OFFSET :skip
@@ -481,26 +492,30 @@ class AIService:
             for row in result:
                 pred = dict(row._mapping)
 
+                # Добавляем modelVersion
+                model_version = pred.get("model_version") or "statistical-v1"
+
                 predictions.append({
                     "id": str(pred["id"]),
-                    "probabilityTeam1": pred["probability_team1"],
-                    "probabilityTeam2": pred["probability_team2"],
-                    "expectedScoreTeam1": pred["expected_score_team1"],
-                    "expectedScoreTeam2": pred["expected_score_team2"],
-                    "confidence": pred["confidence"],
+                    "probabilityTeam1": float(pred["probability_team1"]),
+                    "probabilityTeam2": float(pred["probability_team2"]),
+                    "expectedScoreTeam1": int(pred["expected_score_team1"]),
+                    "expectedScoreTeam2": int(pred["expected_score_team2"]),
+                    "confidence": float(pred["confidence"]),
                     "createdAt": pred["created_at"].isoformat() if pred["created_at"] else None,
-                    "team1Id": pred["team1_id"],
-                    "team2Id": pred["team2_id"],
+                    "team1Id": int(pred["team1_id"]) if pred["team1_id"] else None,
+                    "team2Id": int(pred["team2_id"]) if pred["team2_id"] else None,
                     "team1": {
-                        "id": pred["team1_id"],
+                        "id": int(pred["team1_id"]) if pred["team1_id"] else None,
                         "name": pred["team1_name"] or f"Team {pred['team1_id']}",
                         "abbrev": pred["team1_abbrev"] or f"T{pred['team1_id']}"
                     },
                     "team2": {
-                        "id": pred["team2_id"],
+                        "id": int(pred["team2_id"]) if pred["team2_id"] else None,
                         "name": pred["team2_name"] or f"Team {pred['team2_id']}",
                         "abbrev": pred["team2_abbrev"] or f"T{pred['team2_id']}"
-                    }
+                    },
+                    "modelVersion": model_version  # Добавляем это поле!
                 })
 
             return predictions
@@ -511,6 +526,7 @@ class AIService:
             return []
 
     async def get_prediction_by_id(self, prediction_id: int):
+        """Получение прогноза по ID из PostgreSQL"""
         try:
             print(f"🔍 Получение прогноза ID: {prediction_id}")
 
@@ -519,8 +535,8 @@ class AIService:
                     SELECT 
                         p.id,
                         p.user_id,
-                        p.team1_id,
-                        p.team2_id,
+                        p.team1_id::text as team1_id,
+                        p.team2_id::text as team2_id,
                         p.probability_team1,
                         p.probability_team2,
                         p.expected_score_team1,
@@ -533,8 +549,8 @@ class AIService:
                         t2.full_name as team2_name,
                         t2.abbreviation as team2_abbrev
                     FROM predictions p
-                    LEFT JOIN team t1 ON CAST(p.team1_id AS TEXT) = t1.id
-                    LEFT JOIN team t2 ON CAST(p.team2_id AS TEXT) = t2.id
+                    LEFT JOIN team t1 ON p.team1_id::text = t1.id
+                    LEFT JOIN team t2 ON p.team2_id::text = t2.id
                     WHERE p.id = :id
                 """),
                 {"id": prediction_id}
@@ -551,30 +567,38 @@ class AIService:
                 prob2_rounded = round(prob2, 1)
                 confidence_rounded = round(confidence, 1)
 
+                team1_id_val = int(result.team1_id) if result.team1_id and str(
+                    result.team1_id).isdigit() else result.team1_id
+                team2_id_val = int(result.team2_id) if result.team2_id and str(
+                    result.team2_id).isdigit() else result.team2_id
+
+                model_version = result.model_version or "statistical-v1"
+
                 response = {
                     "id": str(result.id),
+                    "user_id": result.user_id,
                     "probabilityTeam1": prob1_rounded,
                     "probabilityTeam2": prob2_rounded,
                     "expectedScoreTeam1": int(result.expected_score_team1),
                     "expectedScoreTeam2": int(result.expected_score_team2),
                     "confidence": confidence_rounded,
                     "createdAt": result.created_at.isoformat() if result.created_at else None,
-                    "team1Id": int(result.team1_id) if result.team1_id.isdigit() else result.team1_id,
-                    "team2Id": int(result.team2_id) if result.team2_id.isdigit() else result.team2_id,
+                    "team1Id": team1_id_val,
+                    "team2Id": team2_id_val,
                     "team1": {
-                        "id": int(result.team1_id) if result.team1_id.isdigit() else result.team1_id,
+                        "id": team1_id_val,
                         "name": result.team1_name or f"Team {result.team1_id}",
                         "abbrev": result.team1_abbrev or f"T{result.team1_id}"
                     },
                     "team2": {
-                        "id": int(result.team2_id) if result.team2_id.isdigit() else result.team2_id,
+                        "id": team2_id_val,
                         "name": result.team2_name or f"Team {result.team2_id}",
                         "abbrev": result.team2_abbrev or f"T{result.team2_id}"
                     },
-                    "modelVersion": result.model_version or "statistical-v1"
+                    "modelVersion": model_version  # Добавляем поле!
                 }
 
-                print(f"📤 Отправка ответа: {response}")
+                print(f"📤 Отправка ответа для ID {prediction_id}")
                 return response
 
             print(f"❌ Прогноз с ID {prediction_id} не найден")
