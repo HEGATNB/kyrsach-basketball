@@ -8,7 +8,27 @@ import { hexToRgba } from '@/shared/lib/teamBrand';
 
 type PlayersView = 'cards' | 'board';
 
-const PLAYER_IMAGE_FALLBACK = 'https://www.basketball-reference.com/req/202503171/images/players/';
+// Функция для получения ссылки на фото игрока (такая же как в PlayerCard)
+function getPlayerImageUrl(player: Player): string {
+  if (player.image_url) return player.image_url;
+
+  const firstName = player.first_name?.toLowerCase() || '';
+  const lastName = player.last_name?.toLowerCase() || '';
+
+  // Очищаем от спецсимволов (апострофы, дефисы и т.д.)
+  const cleanLastName = lastName.replace(/[^a-z]/g, '');
+  const cleanFirstName = firstName.replace(/[^a-z]/g, '');
+
+  const lastNamePart = cleanLastName.substring(0, 5);
+  const firstNamePart = cleanFirstName.substring(0, 2);
+
+  return `https://www.basketball-reference.com/req/202503171/images/players/${lastNamePart}${firstNamePart}01.jpg`;
+}
+
+function getPlayerFallbackImage(player: Player) {
+  if (player.team?.logoUrl) return player.team.logoUrl;
+  return 'https://www.basketball-reference.com/req/202503171/images/league/NBA_logo.png';
+}
 
 function formatFullName(player: Player) {
   return `${player.first_name} ${player.last_name}`.trim();
@@ -42,12 +62,6 @@ function getPlayerSummary(player: Player) {
   const name = formatFullName(player);
   const teamName = player.team?.name || 'his team';
   return `${name} profiles as a ${getPlayerArchetype(player)} for ${teamName}, bringing ${player.points_per_game.toFixed(1)} points and ${player.assists_per_game.toFixed(1)} assists per game.`;
-}
-
-function getPlayerFallbackImage(player: Player) {
-  if (player.team?.logoUrl) return player.team.logoUrl;
-
-  return 'https://www.basketball-reference.com/req/202503171/images/league/NBA_logo.png';
 }
 
 function getPlayerStrengths(player: Player) {
@@ -286,6 +300,7 @@ export default function PlayersPage() {
               </thead>
               <tbody>
                 {filteredPlayers.map((player) => {
+                  const playerImageUrl = getPlayerImageUrl(player);
                   const fallbackImage = getPlayerFallbackImage(player);
 
                   return (
@@ -293,7 +308,7 @@ export default function PlayersPage() {
                       <td className="px-5 py-4 align-middle">
                         <div className="flex min-w-0 items-center gap-4">
                           <img
-                            src={player.image_url || fallbackImage}
+                            src={playerImageUrl}
                             alt={formatFullName(player)}
                             className="h-14 w-14 shrink-0 rounded-[12px] border border-white/8 object-cover object-top"
                             loading="lazy"
@@ -346,13 +361,14 @@ export default function PlayersPage() {
 
           <div className="lg:hidden">
             {filteredPlayers.map((player) => {
+              const playerImageUrl = getPlayerImageUrl(player);
               const fallbackImage = getPlayerFallbackImage(player);
 
               return (
-                <div key={player.id} className="table-row px-5 py-4">
+                <div key={player.id} className="border-b border-white/6 p-5 last:border-0">
                   <div className="flex min-w-0 items-center gap-4">
                     <img
-                      src={player.image_url || fallbackImage}
+                      src={playerImageUrl}
                       alt={formatFullName(player)}
                       className="h-14 w-14 shrink-0 rounded-[12px] border border-white/8 object-cover object-top"
                       loading="lazy"
@@ -433,7 +449,7 @@ export default function PlayersPage() {
 
                     <div className="mt-6 overflow-hidden rounded-[18px] border border-white/10 bg-black/20">
                       <img
-                        src={selectedPlayer.image_url || getPlayerFallbackImage(selectedPlayer)}
+                        src={getPlayerImageUrl(selectedPlayer)}
                         alt={formatFullName(selectedPlayer)}
                         className="h-[320px] w-full object-cover object-top"
                         loading="eager"

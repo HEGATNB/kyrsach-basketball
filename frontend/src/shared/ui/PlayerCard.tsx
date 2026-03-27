@@ -31,16 +31,29 @@ interface PlayerCardProps {
   onOpenDetails?: () => void;
 }
 
+// Функция для очистки имени от спецсимволов
+function cleanNameForSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z]/g, '') // Убираем всё кроме букв
+    .substring(0, 5);
+}
+
 // Функция для получения ссылки на фото игрока с basketball-reference.com
 function getPlayerImageUrl(player: PlayerCardProps['player']): string {
+  // Если есть прямой URL, используем его
   if (player.image_url) return player.image_url;
 
-  const firstName = player.first_name.toLowerCase();
-  const lastName = player.last_name.toLowerCase();
-  
+  const firstName = player.first_name?.toLowerCase() || '';
+  const lastName = player.last_name?.toLowerCase() || '';
+
+  // Очищаем от спецсимволов (апострофы, дефисы и т.д.)
+  const cleanLastName = lastName.replace(/[^a-z]/g, '');
+  const cleanFirstName = firstName.replace(/[^a-z]/g, '');
+
   // Берем первые 5 букв фамилии и первые 2 буквы имени
-  const lastNamePart = lastName.substring(0, 5);
-  const firstNamePart = firstName.substring(0, 2);
+  const lastNamePart = cleanLastName.substring(0, 5);
+  const firstNamePart = cleanFirstName.substring(0, 2);
   
   return `https://www.basketball-reference.com/req/202503171/images/players/${lastNamePart}${firstNamePart}01.jpg`;
 }
