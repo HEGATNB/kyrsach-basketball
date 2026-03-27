@@ -21,12 +21,21 @@ export const TeamPage = () => {
       return;
     }
 
-    Promise.all([apiRequest<Team>(`/teams/${teamId}`), apiRequest<Player[]>(`/players?team_id=${teamId}`)])
-      .then(([teamData, playerData]) => {
+    // Загружаем информацию о команде
+    apiRequest<Team>(`/teams/${teamId}`)
+      .then((teamData) => {
         setTeam(teamData);
-        setPlayers(playerData);
+        // После получения команды, загружаем игроков по аббревиатуре
+        if (teamData.abbrev) {
+          return apiRequest<Player[]>(`/players/team/${teamData.abbrev}`)
+            .then(setPlayers);
+        }
+        return [];
       })
-      .catch(() => setError('Unable to load this team profile right now.'))
+      .catch((err) => {
+        console.error('Error loading team data:', err);
+        setError('Unable to load this team profile right now.');
+      })
       .finally(() => setLoading(false));
   }, [teamId]);
 

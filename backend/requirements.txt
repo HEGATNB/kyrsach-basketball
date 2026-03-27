@@ -13,9 +13,16 @@ requests==2.31.0
 # Вместо passlib используем прямой bcrypt
 bcrypt==4.0.1
 
+# Планировщик задач
+APScheduler==3.10.4
+
 # Data Science зависимости
 numpy==1.26.0
 pandas==2.1.4
 scikit-learn==1.3.2
 tensorflow==2.16.1
 beautifulsoup4==4.12.2
+
+# Дополнительные утилиты
+httpx==0.25.1
+aiofiles==23.2.1

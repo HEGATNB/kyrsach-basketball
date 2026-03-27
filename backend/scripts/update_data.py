@@ -1,4 +1,3 @@
-# update_data.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd

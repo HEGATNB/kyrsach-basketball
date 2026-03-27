@@ -1,3 +1,4 @@
+# controllers/teams.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -11,6 +12,10 @@ from middleware.auth import require_admin_or_operator, require_admin, get_curren
 router = APIRouter()
 
 
+# ========== ВАЖНО: Добавляем оба варианта маршрутов ==========
+# Вариант без слэша - для запросов из браузера
+@router.get("", response_model=List[schemas.TeamResponse])
+# Вариант со слэшем - для обратной совместимости
 @router.get("/", response_model=List[schemas.TeamResponse])
 async def get_all_teams(
         skip: int = 0,
@@ -22,7 +27,6 @@ async def get_all_teams(
     teams = team_service.get_all_teams(skip=skip, limit=limit)
 
     if not teams:
-        # Если нет команд, возвращаем пустой список
         return []
 
     return teams
@@ -37,12 +41,13 @@ async def get_team_by_id(team_id: int, db: Session = Depends(get_db)):
     if not team:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Команда с ID {team_id} не найдена"
+            detail=f"Team with ID {team_id} not found"
         )
 
     return team
 
 
+@router.post("", response_model=schemas.TeamResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=schemas.TeamResponse, status_code=status.HTTP_201_CREATED)
 async def create_team(
         team_data: schemas.TeamCreate,
@@ -50,23 +55,20 @@ async def create_team(
         db: Session = Depends(get_db)
 ):
     """Создание новой команды (только для админов и операторов)"""
-    # Проверка прав доступа
     user = await require_admin_or_operator(request)
 
     team_service = TeamService(db)
 
-    # Проверка существования команды с таким названием
     existing = team_service.get_team_by_name(team_data.full_name)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Команда с таким названием уже существует"
+            detail="Team with this name already exists"
         )
 
     try:
         team = team_service.create_team(team_data, user.user_id)
 
-        # Логирование
         audit_service = AuditService(db)
         audit_service.log(
             user_id=user.user_id,
@@ -86,7 +88,7 @@ async def create_team(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при создании команды: {str(e)}"
+            detail=f"Error creating team: {str(e)}"
         )
 
 
@@ -98,7 +100,6 @@ async def update_team(
         db: Session = Depends(get_db)
 ):
     """Обновление команды"""
-    # Проверка прав доступа
     user = await require_admin_or_operator(request)
 
     team_service = TeamService(db)
@@ -107,7 +108,7 @@ async def update_team(
     if not team:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Команда с ID {team_id} не найдена"
+            detail=f"Team with ID {team_id} not found"
         )
 
     try:
@@ -132,7 +133,7 @@ async def update_team(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при обновлении команды: {str(e)}"
+            detail=f"Error updating team: {str(e)}"
         )
 
 
@@ -143,7 +144,6 @@ async def delete_team(
         db: Session = Depends(get_db)
 ):
     """Удаление команды (только для админов)"""
-    # Проверка прав доступа
     user = await require_admin(request)
 
     team_service = TeamService(db)
@@ -152,7 +152,7 @@ async def delete_team(
     if not team:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Команда с ID {team_id} не найдена"
+            detail=f"Team with ID {team_id} not found"
         )
 
     try:
@@ -168,7 +168,7 @@ async def delete_team(
             ip_address=request.client.host if request.client else None
         )
 
-        return {"message": "Команда удалена", "team": deleted_team}
+        return {"message": "Team deleted", "team": deleted_team}
     except PermissionError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -177,5 +177,5 @@ async def delete_team(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при удалении команды: {str(e)}"
+            detail=f"Error deleting team: {str(e)}"
         )

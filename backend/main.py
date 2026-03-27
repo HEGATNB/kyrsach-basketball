@@ -1,3 +1,5 @@
+# main.py - полная исправленная версия
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -9,6 +11,7 @@ import asyncio
 from tensorflow.keras.models import load_model
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
 
 # Импортируем контроллеры из папки controllers
 from controllers import auth, teams, matches, predictions, players
@@ -21,13 +24,20 @@ from scripts.train_model import train_model
 from database import engine, Base, get_db
 from sqlalchemy.orm import Session
 
+# Импортируем планировщик
+from scheduler import data_updater
+import atexit
+
+# Импортируем сервис для метрик
+from services.model_metrics_service import ModelMetricsService
+
 app = FastAPI(
     title="HoopsAI API",
     description="API для прогнозирования баскетбольных матчей",
     version="1.0.0"
 )
 
-# CORS
+# CORS - правильно настроенный
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -80,11 +90,31 @@ def load_artifacts():
                 team_emas = pickle.load(f)
             if os.path.exists(teams_path):
                 teams_df = pd.read_csv(teams_path)
-            print("✅ Нейросеть загружена успешно")
+            print("Neural network loaded successfully")
         except Exception as e:
-            print(f"⚠️ Ошибка загрузки нейросети: {e}")
+            print(f"Error loading neural network: {e}")
     else:
-        print("⚠️ Нейросеть не найдена. Сначала запустите train_model.py")
+        print("Neural network not found. Run train_model.py first.")
+
+
+@app.on_event("startup")
+async def start_scheduler():
+    """Запуск планировщика при старте приложения"""
+    try:
+        data_updater.start()
+        print("Scheduler started")
+    except Exception as e:
+        print(f"Error starting scheduler: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    """Остановка планировщика при завершении приложения"""
+    try:
+        data_updater.stop()
+        print("Scheduler stopped")
+    except Exception as e:
+        print(f"Error stopping scheduler: {e}")
 
 
 # ========== ЭНДПОИНТЫ ДЛЯ НЕЙРОСЕТИ ==========
@@ -93,7 +123,7 @@ def load_artifacts():
 def get_neural_teams():
     """Список команд для нейросети"""
     if teams_df is None:
-        raise HTTPException(status_code=503, detail="Нейросеть не загружена")
+        raise HTTPException(status_code=503, detail="Neural network not loaded")
     return teams_df[['team_abbrev', 'team_name']].drop_duplicates().to_dict(orient='records')
 
 
@@ -102,19 +132,19 @@ def get_neural_teams():
 def neural_predict(request: NeuralPredictionRequest):
     """Предсказание от нейросети"""
     if model is None or scaler is None or teams_df is None:
-        raise HTTPException(status_code=503, detail="Нейросеть не загружена")
+        raise HTTPException(status_code=503, detail="Neural network not loaded")
 
     home_row = teams_df[teams_df['team_abbrev'] == request.home_team]
     away_row = teams_df[teams_df['team_abbrev'] == request.away_team]
 
     if home_row.empty or away_row.empty:
-        raise HTTPException(status_code=404, detail="Команда не найдена")
+        raise HTTPException(status_code=404, detail="Team not found")
 
     home_id = str(home_row.iloc[0]['team_id'])
     away_id = str(away_row.iloc[0]['team_id'])
 
     if home_id not in team_emas or away_id not in team_emas:
-        raise HTTPException(status_code=404, detail="Данные команды недоступны")
+        raise HTTPException(status_code=404, detail="Team data not available")
 
     home_ema = team_emas[home_id]
     away_ema = team_emas[away_id]
@@ -141,22 +171,106 @@ def neural_predict(request: NeuralPredictionRequest):
 async def neural_retrain(background_tasks: BackgroundTasks):
     """Переобучение нейросети в фоне"""
     background_tasks.add_task(retrain_task)
-    return {"message": "Переобучение запущено в фоне. Это может занять несколько минут."}
+    return {"message": "Retraining started in background. This may take several minutes."}
 
 
 async def retrain_task():
     """Фоновая задача для переобучения"""
     try:
         loop = asyncio.get_event_loop()
-        print("🔄 Начало обновления данных...")
+        print("Starting data update...")
         await loop.run_in_executor(None, update_db_with_new_games, None, 7)
-        print("✅ Данные обновлены. Начало обучения модели...")
+        print("Data updated. Starting model training...")
         await loop.run_in_executor(None, train_model, None)
-        print("✅ Модель обучена. Перезагрузка артефактов...")
+        print("Model trained. Reloading artifacts...")
         load_artifacts()
-        print("✅ Переобучение завершено успешно")
+        print("Retraining completed successfully")
     except Exception as e:
-        print(f"❌ Ошибка при переобучении: {e}")
+        print(f"Error during retraining: {e}")
+
+
+# ========== ЭНДПОИНТЫ ДЛЯ МЕТРИК МОДЕЛИ ==========
+@app.get("/api/model/metrics/latest")
+async def get_latest_model_metrics():
+    """Получение последних метрик модели"""
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+        metrics_service = ModelMetricsService(db)
+        metrics = metrics_service.get_latest_metrics()
+        db.close()
+
+        if metrics:
+            return metrics
+        return {"message": "Model metrics not found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting metrics: {str(e)}")
+
+
+@app.get("/api/model/metrics/history")
+async def get_model_metrics_history(limit: int = 10):
+    """Получение истории метрик модели"""
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+        metrics_service = ModelMetricsService(db)
+        history = metrics_service.get_metrics_history(limit)
+        db.close()
+        return history
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting history: {str(e)}")
+
+
+@app.get("/api/model/metrics/stats")
+async def get_model_stats():
+    """Получение статистики по моделям"""
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+        metrics_service = ModelMetricsService(db)
+        stats = metrics_service.get_model_stats()
+        db.close()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting stats: {str(e)}")
+
+
+# ========== АДМИНСКИЕ ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ ОБНОВЛЕНИЯМИ ==========
+@app.get("/api/admin/update-status")
+async def get_update_status(request: Request):
+    """Получение статуса последнего обновления (только для админов)"""
+    from middleware.auth import require_admin
+    await require_admin(request)
+
+    return data_updater.get_status()
+
+
+@app.post("/api/admin/force-data-update")
+async def force_data_update(request: Request):
+    """Принудительное обновление данных (только для админов)"""
+    from middleware.auth import require_admin
+    await require_admin(request)
+
+    asyncio.create_task(data_updater.update_data_daily())
+
+    return {
+        "message": "Data update started",
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.post("/api/admin/force-model-retrain")
+async def force_model_retrain(request: Request):
+    """Принудительное переобучение модели (только для админов)"""
+    from middleware.auth import require_admin
+    await require_admin(request)
+
+    asyncio.create_task(data_updater.retrain_model_weekly())
+
+    return {
+        "message": "Model retraining started",
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 # ========== HEALTH CHECK ==========
@@ -164,7 +278,6 @@ async def retrain_task():
 @app.get("/health")
 async def health_check():
     """Проверка работоспособности API"""
-    # Проверяем подключение к PostgreSQL
     db_status = "unknown"
     try:
         from database import SessionLocal
@@ -180,7 +293,8 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "neural_loaded": model is not None,
         "database": db_status,
-        "service": "HoopsAI API"
+        "service": "HoopsAI API",
+        "scheduler_running": data_updater.scheduler.running if hasattr(data_updater, 'scheduler') else False
     }
 
 
@@ -193,7 +307,6 @@ async def check_database():
         from database import SessionLocal
         db = SessionLocal()
 
-        # Проверяем наличие таблиц
         tables = db.execute("""
             SELECT table_name 
             FROM information_schema.tables 
@@ -202,14 +315,12 @@ async def check_database():
 
         table_list = [t[0] for t in tables]
 
-        # Проверяем наличие данных в game
         game_count = 0
         sample_games = []
 
         if 'game' in table_list:
             game_count = db.execute("SELECT COUNT(*) as count FROM game").scalar()
 
-            # Покажем несколько первых записей для отладки
             games = db.execute("""
                 SELECT game_id, team_name_home, team_name_away, game_date 
                 FROM game 
@@ -242,6 +353,7 @@ async def check_database():
 
 
 # ========== ПОДКЛЮЧАЕМ КОНТРОЛЛЕРЫ ==========
+# Подключаем с правильными префиксами - без трейлинг слэшей
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
@@ -260,13 +372,27 @@ app.include_router(players.router, prefix="/players", tags=["players"])
 @app.get("/")
 async def root():
     return {
-        "message": "HoopsAI API работает!",
+        "message": "HoopsAI API is running",
         "version": "1.0.0",
         "database": "PostgreSQL",
         "neural_loaded": model is not None,
+        "scheduler": {
+            "daily_update": "23:59",
+            "weekly_retrain": "Sunday 00:30"
+        },
         "endpoints": {
             "health": "/api/health or /health",
             "debug": "/api/debug/db-check or /debug/db-check",
+            "model_metrics": {
+                "latest": "/api/model/metrics/latest",
+                "history": "/api/model/metrics/history",
+                "stats": "/api/model/metrics/stats"
+            },
+            "admin": {
+                "update_status": "/api/admin/update-status",
+                "force_data_update": "POST /api/admin/force-data-update",
+                "force_model_retrain": "POST /api/admin/force-model-retrain"
+            },
             "neural": {
                 "teams": "/api/neural/teams or /neural/teams",
                 "predict": "POST /api/neural/predict or /neural/predict",

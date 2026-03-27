@@ -11,6 +11,8 @@ class MatchService:
 
     # services/match_service.py - исправленная генерация ID
 
+    # services/match_service.py - только исправленный метод get_all_matches
+
     def get_all_matches(self, filters: Dict = None, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
         """Получение всех матчей"""
         try:
@@ -39,9 +41,9 @@ class MatchService:
 
             if filters and filters.get("status"):
                 if filters["status"] == "finished":
-                    where_clauses.append("g.wl_home IS NOT NULL")
+                    where_clauses.append("g.pts_home IS NOT NULL AND g.pts_away IS NOT NULL")
                 elif filters["status"] == "scheduled":
-                    where_clauses.append("g.wl_home IS NULL")
+                    where_clauses.append("g.pts_home IS NULL OR g.pts_away IS NULL")
 
             if where_clauses:
                 query += " AND " + " AND ".join(where_clauses)
@@ -53,18 +55,29 @@ class MatchService:
             result = self.db.execute(text(query), params).fetchall()
 
             matches = []
-            # Используем set для отслеживания использованных ID
             used_ids = set()
 
             for row in result:
                 game = dict(row._mapping)
 
-                has_score = game.get("pts_home") is not None and game.get("pts_away") is not None
+                # Определяем статус по наличию счета
+                has_score = (game.get("pts_home") is not None and
+                             game.get("pts_away") is not None and
+                             game.get("pts_home") > 0 and
+                             game.get("pts_away") > 0)
+
                 status = "finished" if has_score else "scheduled"
 
+                # Получаем счет (если есть)
+                home_score = None
+                away_score = None
+                if has_score:
+                    home_score = int(float(game.get("pts_home"))) if game.get("pts_home") else None
+                    away_score = int(float(game.get("pts_away"))) if game.get("pts_away") else None
+
+                # Парсим дату
                 game_date = game.get("game_date")
                 date_str = None
-
                 if game_date:
                     if isinstance(game_date, datetime):
                         date_str = game_date.isoformat()
@@ -78,16 +91,12 @@ class MatchService:
                         except:
                             date_str = game_date
 
-                # Генерируем уникальный ID на основе game_id и season_id
+                # Генерируем уникальный ID
                 game_id_val = game.get("game_id")
                 season_id_val = game.get("season_id")
-
-                # Создаем уникальный ключ
                 unique_key = f"{game_id_val}_{season_id_val}"
-                # Генерируем числовой ID из уникального ключа
                 match_id = abs(hash(unique_key)) % (10 ** 8)
 
-                # Если ID уже использован, добавляем счетчик
                 original_id = match_id
                 counter = 1
                 while match_id in used_ids:
@@ -120,8 +129,8 @@ class MatchService:
                         "name": away_team_name,
                         "abbrev": game.get("away_team_abbrev", f"T{game.get('team_id_away')}")
                     },
-                    "home_score": int(float(game.get("pts_home"))) if game.get("pts_home") is not None else None,
-                    "away_score": int(float(game.get("pts_away"))) if game.get("pts_away") is not None else None,
+                    "home_score": home_score,
+                    "away_score": away_score,
                     "season": game.get("season_id"),
                     "season_type": game.get("season_type")
                 }
@@ -130,7 +139,7 @@ class MatchService:
             return matches
 
         except Exception as e:
-            print(f"❌ Ошибка получения матчей: {e}")
+            print(f"Error getting matches: {e}")
             import traceback
             traceback.print_exc()
             return []

@@ -242,7 +242,6 @@ class PlayerService:
             return None
 
     def get_players_by_team(self, team_abbrev: str) -> List[Dict[str, Any]]:
-        """Получение игроков команды"""
         return self.get_all_players(team_abbrev=team_abbrev)
 
     def get_seasons(self) -> List[str]:
