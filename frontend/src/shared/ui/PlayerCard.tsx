@@ -9,10 +9,10 @@ interface PlayerCardProps {
     id: number;
     first_name: string;
     last_name: string;
-    number?: number;
+    number?: string;
     position?: string;
     height?: string;
-    weight?: number;
+    weight?: number;  // number, НЕ string!
     minutes_per_game?: number;
     points_per_game: number;
     rebounds_per_game: number;
@@ -135,7 +135,7 @@ export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: Player
           </div>
           <div className="flex min-h-[30px] items-center justify-between gap-3 border-b border-white/6 pb-2 text-slate-300">
             <span className="text-slate-500">Weight</span>
-            <span className="font-medium text-white">{player.weight ? `${player.weight} kg` : 'N/A'}</span>
+            <span className="font-medium text-white">{player.weight ? `${Math.round(player.weight)} kg` : 'N/A'}</span>
           </div>
           <div className="flex min-h-[30px] items-center justify-between gap-3 text-slate-300">
             <span className="text-slate-500">Minutes</span>

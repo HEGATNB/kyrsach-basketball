@@ -524,8 +524,9 @@ export default function PlayersPage() {
                         <p className="mt-2 text-sm font-medium text-white">{selectedPlayer.height || 'N/A'}</p>
                       </div>
                       <div className="surface-muted">
-                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Weight</p>
-                        <p className="mt-2 text-sm font-medium text-white">{selectedPlayer.weight ? `${selectedPlayer.weight} kg` : 'N/A'}</p>
+                         <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Weight</p>
+                         <p className="mt-2 text-sm font-medium text-white">
+                            {selectedPlayer.weight ? `${Math.round(selectedPlayer.weight)} kg` : 'N/A'}</p>
                       </div>
                       <div className="surface-muted">
                         <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Minutes</p>

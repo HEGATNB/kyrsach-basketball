@@ -48,7 +48,6 @@ class TeamBase(BaseModel):
     arena: Optional[str] = None
     founded_year: Optional[int] = None
 
-# schemas.py (только изменения в PlayerBase и PlayerResponse)
 
 class PlayerBase(BaseModel):
     first_name: Optional[str] = None
@@ -57,7 +56,7 @@ class PlayerBase(BaseModel):
     number: Optional[str] = None
     position: Optional[str] = None
     height: Optional[str] = None
-    weight: Optional[str] = None
+    weight: Optional[float] = None  # меняем с Optional[str] на Optional[float]
     birth_date: Optional[str] = None
     country: Optional[str] = None
     team_abbrev: Optional[str] = None
@@ -86,7 +85,6 @@ class PlayerBase(BaseModel):
     draft_round: Optional[str] = None
     draft_number: Optional[str] = None
     college: Optional[str] = None
-
 
 class PlayerResponse(PlayerBase):
     id: int

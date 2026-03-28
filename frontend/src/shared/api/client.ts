@@ -44,7 +44,7 @@ export interface Player {
   id: number;
   first_name: string;
   last_name: string;
-  number?: number;
+  number?: string;
   position?: string;
   team_id: number;
   height?: string;
@@ -68,25 +68,46 @@ export interface Player {
   usage_rate?: number;
   true_shooting?: number;
   net_rating?: number;
+  assist_percentage?: number;
+  offensive_rebound_pct?: number;
+  defensive_rebound_pct?: number;
+  player_height?: string;
+  player_weight?: number;
+  age?: number;
+  team_abbrev?: string;
 }
 
-export interface Prediction {
-  id: string;
-  team1Id: number;
-  team2Id: number;
-  team1?: Team;
-  team2?: Team;
-  probabilityTeam1: number;
-  probabilityTeam2: number;
-  expectedScoreTeam1: number;
-  expectedScoreTeam2: number;
-  confidence: number;
-  createdAt: string;
-  probabilities: { team1: number; team2: number };
-  expectedScore: { team1: number; team2: number };
-  modelVersion?: string;
-  trainingDataPoints?: number;
-  factors?: Record<string, number>;
+export interface Player {
+  id: number;
+  first_name: string;
+  last_name: string;
+  number?: string;
+  position?: string;
+  height?: string;
+  weight?: number;  // ДОЛЖНО БЫТЬ number, НЕ string!
+  minutes_per_game?: number;
+  points_per_game: number;
+  rebounds_per_game: number;
+  assists_per_game: number;
+  steals_per_game?: number;
+  blocks_per_game?: number;
+  image_url?: string;
+  team?: Team;
+  games_played?: number;
+  season?: string;
+  college?: string;
+  country?: string;
+  draft_year?: string;
+  draft_round?: string;
+  draft_number?: string;
+  usage_rate?: number;
+  true_shooting?: number;
+  net_rating?: number;
+  assist_percentage?: number;
+  offensive_rebound_pct?: number;
+  defensive_rebound_pct?: number;
+  age?: number;
+  team_abbrev?: string;
 }
 
 export interface AdminUser extends AuthUser {
