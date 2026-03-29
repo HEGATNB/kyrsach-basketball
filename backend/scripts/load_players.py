@@ -1,20 +1,19 @@
-# load_players.py
+# scripts/load_players.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
-from dotenv import load_dotenv
-import csv
-import requests
-from io import StringIO
+import sys
+from pathlib import Path
 import pandas as pd
 
-load_dotenv()
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from config import config
 
-DB_NAME = os.getenv("DB_NAME", "nba")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "12345678")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = config.DB_NAME
+DB_USER = config.DB_USER
+DB_PASSWORD = config.DB_PASSWORD
+DB_HOST = config.DB_HOST
+DB_PORT = config.DB_PORT
 
 
 def get_db_connection():
@@ -53,7 +52,7 @@ def check_players_table():
             """)
             columns = cursor.fetchall()
             print(f"📊 Таблица 'players' существует, колонок: {len(columns)}")
-            for col in columns[:10]:  # Покажем первые 10
+            for col in columns[:10]:
                 print(f"   - {col['column_name']}: {col['data_type']}")
         else:
             print("❌ Таблица 'players' не найдена")
@@ -61,7 +60,6 @@ def check_players_table():
         cursor.close()
         conn.close()
         return exists
-
     except Exception as e:
         print(f"❌ Ошибка проверки таблицы: {e}")
         return False
@@ -81,13 +79,11 @@ def load_players_from_csv(csv_path):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Очищаем таблицу если нужно
         response = input("Очистить таблицу players перед загрузкой? (y/n): ")
         if response.lower() == 'y':
             cursor.execute("TRUNCATE TABLE players RESTART IDENTITY CASCADE")
             print("✅ Таблица очищена")
 
-        # Вставляем данные
         inserted = 0
         for _, row in df.iterrows():
             try:
@@ -123,7 +119,6 @@ def load_players_from_csv(csv_path):
 
         print(f"✅ Загружено {inserted} игроков")
         return inserted
-
     except Exception as e:
         print(f"❌ Ошибка загрузки: {e}")
         return 0
@@ -138,7 +133,6 @@ def load_from_common_player_info():
         cursor.execute("SELECT COUNT(*) as count FROM common_player_info")
         result = cursor.fetchone()
         count = result['count'] if result else 0
-
         print(f"📊 В common_player_info: {count} записей")
 
         if count > 0:
@@ -150,7 +144,6 @@ def load_from_common_player_info():
 
         cursor.close()
         conn.close()
-
     except Exception as e:
         print(f"❌ Ошибка проверки common_player_info: {e}")
 
@@ -183,7 +176,6 @@ def get_player_stats_summary():
 
         cursor.close()
         conn.close()
-
     except Exception as e:
         print(f"❌ Ошибка получения статистики: {e}")
 
@@ -193,16 +185,12 @@ if __name__ == "__main__":
     print("🔄 ПРОВЕРКА ДАННЫХ ИГРОКОВ")
     print("=" * 50)
 
-    # Проверяем таблицу players
     if check_players_table():
-        # Показываем статистику
         get_player_stats_summary()
 
-    # Проверяем common_player_info
     print("\n" + "=" * 50)
     load_from_common_player_info()
 
-    # Спрашиваем про загрузку из CSV
     print("\n" + "=" * 50)
     csv_path = input("Путь к CSV файлу с игроками (или Enter для пропуска): ").strip()
     if csv_path:

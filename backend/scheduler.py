@@ -28,10 +28,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Обновление данных и переобучение модели
 
 class DataUpdater:
-    """Класс для автоматического обновления данных и переобучения модели"""
-
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
         self.last_update_status = None
@@ -44,19 +43,24 @@ class DataUpdater:
         logger.info(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         try:
-            logger.info("Loading new games from ESPN...")
-            new_games = update_db_with_new_games(days_back=1)
-            logger.info(f"Loaded new games: {new_games}")
+            logger.info("Loading new games and updating results from ESPN...")
+            # days_back=2 - проверяем вчера и сегодня
+            result = update_db_with_new_games(days_back=2)
 
+            logger.info(f"Updated results (scheduled -> finished): {result.get('updated_results', 0)}")
+            logger.info(f"New games added: {result.get('new_games', 0)}")
+
+            # Логируем обновление
             try:
                 db = SessionLocal()
                 audit = AuditService(db)
                 audit.log(
-                    user_id=1,
+                    user_id=1,  # system user
                     action="DATA_UPDATE",
                     entity="System",
                     details={
-                        "new_games": new_games,
+                        "updated_results": result.get('updated_results', 0),
+                        "new_games": result.get('new_games', 0),
                         "update_type": "daily",
                         "timestamp": datetime.now().isoformat()
                     }
@@ -68,18 +72,16 @@ class DataUpdater:
             self.last_update_status = {
                 "success": True,
                 "timestamp": datetime.now().isoformat(),
-                "new_games": new_games
+                "updated_results": result.get('updated_results', 0),
+                "new_games": result.get('new_games', 0)
             }
 
             logger.info(f"DAILY DATA UPDATE COMPLETED")
-            logger.info(f"New games: {new_games}")
+            logger.info(f"Updated results: {result.get('updated_results', 0)}")
+            logger.info(f"New games: {result.get('new_games', 0)}")
             logger.info("=" * 60)
 
-            return {
-                "success": True,
-                "new_games": new_games,
-                "timestamp": datetime.now().isoformat()
-            }
+            return result
 
         except Exception as e:
             logger.error(f"DATA UPDATE ERROR: {e}")
@@ -98,7 +100,6 @@ class DataUpdater:
             }
 
     async def retrain_model_weekly(self):
-        """Еженедельное переобучение модели"""
         logger.info("=" * 60)
         logger.info("START WEEKLY MODEL RETRAINING")
         logger.info(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

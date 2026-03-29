@@ -1,12 +1,17 @@
-# config.py
 import os
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import List
 import secrets
 
-# Загружаем .env только в development
-if os.getenv("ENVIRONMENT") != "production":
+# Загружаем env (файл без точки)
+BASE_DIR = Path(__file__).resolve().parent
+env_path = BASE_DIR / 'env'
+if env_path.exists():
+    load_dotenv(env_path)
+    print(f"✅ Загружен env файл: {env_path}")
+else:
+    print(f"⚠️ env файл не найден: {env_path}")
     load_dotenv()
 
 
@@ -18,13 +23,11 @@ class Config:
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = os.getenv("DB_PORT", "5432")
 
-    # Формируем URL для подключения
     @property
     def DATABASE_URL(self) -> str:
         """Формирует URL для подключения к БД"""
         if all([self.DB_NAME, self.DB_USER, self.DB_PASSWORD]):
             return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        # Если нет отдельных параметров, пробуем получить полный URL
         return os.getenv("DATABASE_URL", "")
 
     # JWT настройки
@@ -32,9 +35,8 @@ class Config:
     if not JWT_SECRET and os.getenv("ENVIRONMENT") == "production":
         raise ValueError("JWT_SECRET must be set in production!")
     elif not JWT_SECRET:
-        # В development генерируем случайный ключ при каждом запуске
         JWT_SECRET = secrets.token_urlsafe(32)
-        print("⚠️  WARNING: Using generated JWT secret. Set JWT_SECRET in .env for production!")
+        print("⚠️  WARNING: Using generated JWT secret. Set JWT_SECRET in env for production!")
 
     JWT_EXPIRES_IN = os.getenv("JWT_EXPIRES_IN", "7d")
 
@@ -49,16 +51,13 @@ class Config:
     # Окружение
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-    # CORS настройки - в продакшене только конкретные домены!
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
         if self.ENVIRONMENT == "production":
-            # В продакшене - только реальные домены
             return [
                 "https://yourdomain.com",
                 "https://api.yourdomain.com"
             ]
-        # В разработке - локальные адреса
         return [
             "http://localhost:3000",
             "http://localhost:5173",
