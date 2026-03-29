@@ -1,4 +1,3 @@
-# controllers/teams.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -11,18 +10,14 @@ from middleware.auth import require_admin_or_operator, require_admin, get_curren
 
 router = APIRouter()
 
-
-# ========== ВАЖНО: Добавляем оба варианта маршрутов ==========
-# Вариант без слэша - для запросов из браузера
+# Роты со слешем и без для обратной совместимости
 @router.get("", response_model=List[schemas.TeamResponse])
-# Вариант со слэшем - для обратной совместимости
 @router.get("/", response_model=List[schemas.TeamResponse])
 async def get_all_teams(
         skip: int = 0,
         limit: int = 100,
         db: Session = Depends(get_db)
 ):
-    """Получение списка всех команд"""
     team_service = TeamService(db)
     teams = team_service.get_all_teams(skip=skip, limit=limit)
 
@@ -34,7 +29,6 @@ async def get_all_teams(
 
 @router.get("/{team_id}", response_model=schemas.TeamResponse)
 async def get_team_by_id(team_id: int, db: Session = Depends(get_db)):
-    """Получение команды по ID"""
     team_service = TeamService(db)
     team = team_service.get_team_by_id(team_id)
 
@@ -54,7 +48,6 @@ async def create_team(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Создание новой команды (только для админов и операторов)"""
     user = await require_admin_or_operator(request)
 
     team_service = TeamService(db)
@@ -99,7 +92,6 @@ async def update_team(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Обновление команды"""
     user = await require_admin_or_operator(request)
 
     team_service = TeamService(db)
@@ -143,7 +135,6 @@ async def delete_team(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Удаление команды (только для админов)"""
     user = await require_admin(request)
 
     team_service = TeamService(db)

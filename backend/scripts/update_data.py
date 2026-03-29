@@ -1,4 +1,3 @@
-# scripts/update_data.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
@@ -8,13 +7,10 @@ import io
 import requests
 import os
 from pathlib import Path
-
-# Добавляем путь к корню проекта
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-
 from config import config
 
-# Исправляем проблемы с кодировкой в Windows
+# Устанавливаем кодирвку
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
@@ -76,7 +72,6 @@ SPECIAL_GAME_KEYWORDS = ['Team', 'World', 'USA', 'All-Star', 'All Star', 'Rising
 
 
 def get_db_connection():
-    """Создает подключение к PostgreSQL"""
     conn = psycopg2.connect(
         dbname=DB_NAME,
         user=DB_USER,
@@ -87,9 +82,9 @@ def get_db_connection():
     )
     return conn
 
+# Создание словаря {team_abbreviation: team_id} из таблицы game
 
 def get_team_id_map(conn):
-    """Создаёт словарь {team_abbreviation: team_id} из таблицы game."""
     cursor = conn.cursor()
     cursor.execute("""
         SELECT DISTINCT team_abbreviation_home as abbrev, team_id_home as team_id 
@@ -109,16 +104,15 @@ def get_team_id_map(conn):
 
 
 def is_special_game(away_name, home_name):
-    """Проверяет, является ли игра специальной"""
     combined = f"{away_name} {home_name}".lower()
     for keyword in SPECIAL_GAME_KEYWORDS:
         if keyword.lower() in combined:
             return True
     return False
 
+# Получение новых игр
 
 def fetch_espn_games(date):
-    """Получает игры за указанную дату через ESPN API."""
     date_str = date.strftime("%Y%m%d")
     url = "http://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
     params = {"dates": date_str, "limit": 100}
@@ -133,9 +127,9 @@ def fetch_espn_games(date):
         print(f"  ❌ Error fetching ESPN: {e}")
         return []
 
+# Получаем статистику игры
 
 def fetch_detailed_stats(game_id):
-    """Получает детальную статистику игры с ESPN."""
     url = f"http://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
     params = {"event": game_id}
 
@@ -163,10 +157,6 @@ def fetch_detailed_stats(game_id):
 
 
 def update_existing_games(conn, days_back=2):
-    """
-    Обновляет результаты существующих матчей за последние дни.
-    Особенно важно для матчей, которые были в статусе scheduled и теперь завершились.
-    """
     print(f"\n{'=' * 60}")
     print("🔄 ОБНОВЛЕНИЕ РЕЗУЛЬТАТОВ ЗАВЕРШИВШИХСЯ МАТЧЕЙ")
     print(f"📅 Проверяем матчи за последние {days_back} дней")
@@ -377,9 +367,9 @@ def update_existing_games(conn, days_back=2):
 
     return updated_count
 
+# Парсит данные с api и приводит их к структуре как в базе
 
 def parse_espn_game(event, team_id_map):
-    """Преобразует данные игры из ESPN API в формат таблицы game."""
     try:
         game_id = event['id']
         game_date = datetime.strptime(event['date'], "%Y-%m-%dT%H:%MZ")
@@ -482,7 +472,6 @@ def parse_espn_game(event, team_id_map):
 
 
 def game_exists(conn, game_id):
-    """Проверяет, существует ли уже игра в БД"""
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM game WHERE game_id = %s", (game_id,))
     exists = cursor.fetchone() is not None
@@ -491,7 +480,6 @@ def game_exists(conn, game_id):
 
 
 def insert_game(conn, game):
-    """Вставляет запись в таблицу game."""
     cursor = conn.cursor()
     if game_exists(conn, game['game_id']):
         return False
@@ -511,15 +499,8 @@ def insert_game(conn, game):
     finally:
         cursor.close()
 
-
+# Обновляет данные для scheduled матчей и затем добавляет новые матчи
 def update_db_with_new_games(db_path=None, days_back=2):
-    """
-    Обновляет базу новыми играми и результатами через ESPN API.
-
-    Процесс:
-    1. Сначала обновляет результаты уже существующих матчей (scheduled -> finished)
-    2. Затем добавляет новые матчи, которых еще нет в БД
-    """
     print(f"\n{'=' * 60}")
     print(f"🔄 ОБНОВЛЕНИЕ БАЗЫ ДАННЫХ")
     print(f"📅 За последние {days_back} дней")
@@ -529,10 +510,10 @@ def update_db_with_new_games(db_path=None, days_back=2):
     conn = get_db_connection()
     print(f"✅ Подключение к БД установлено")
 
-    # ШАГ 1: Обновляем результаты существующих матчей (scheduled -> finished)
+    # Обновляем результаты существующих матчей (scheduled -> finished)
     updated_results = update_existing_games(conn, days_back)
 
-    # ШАГ 2: Добавляем новые матчи (которых еще нет в БД)
+    # Добавляем новые матчи (которых еще нет в БД)
     print(f"\n{'=' * 60}")
     print("➕ ДОБАВЛЕНИЕ НОВЫХ МАТЧЕЙ")
     print(f"{'=' * 60}")

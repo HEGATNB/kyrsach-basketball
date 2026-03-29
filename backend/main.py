@@ -27,6 +27,7 @@ app = FastAPI(
 )
 
 # CORS
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -41,6 +42,7 @@ app.add_middleware(
 )
 
 # Переменные для нейросети
+
 model = None
 scaler = None
 team_emas = {}
@@ -105,6 +107,7 @@ async def shutdown_scheduler():
 
 
 # Эндпоинты для нейросети
+
 @app.get("/api/neural/teams")
 @app.get("/neural/teams")
 def get_neural_teams():
@@ -173,6 +176,7 @@ async def retrain_task():
 
 
 # Эндпоинты со статистикой модели
+
 @app.get("/api/model/metrics/latest")
 async def get_latest_model_metrics():
     try:
@@ -216,6 +220,7 @@ async def get_model_stats():
 
 
 # Эндпоинты для администраторов
+
 @app.get("/api/admin/update-status")
 async def get_update_status(request: Request):
     from middleware.auth import require_admin
@@ -251,6 +256,7 @@ async def force_model_retrain(request: Request):
 
 
 # Проверка работы API
+
 @app.get("/api/health")
 @app.get("/health")
 async def health_check():

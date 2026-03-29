@@ -1,4 +1,3 @@
-# scheduler.py
 import asyncio
 import logging
 from datetime import datetime
@@ -36,8 +35,8 @@ class DataUpdater:
         self.last_update_status = None
         self.last_retrain_status = None
 
+    # Ежедневное обновление данных
     async def update_data_daily(self):
-        """Ежедневное обновление данных (без переобучения)"""
         logger.info("=" * 60)
         logger.info("START DAILY DATA UPDATE")
         logger.info(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -55,7 +54,7 @@ class DataUpdater:
                 db = SessionLocal()
                 audit = AuditService(db)
                 audit.log(
-                    user_id=1,  # system user
+                    user_id=1,
                     action="DATA_UPDATE",
                     entity="System",
                     details={
@@ -259,8 +258,9 @@ class DataUpdater:
                 "timestamp": datetime.now().isoformat()
             }
 
+    # Запуск планировщика
+
     def start(self):
-        """Запуск планировщика"""
         self.scheduler.add_job(
             self.update_data_daily,
             trigger=CronTrigger(hour=23, minute=59),
@@ -285,13 +285,15 @@ class DataUpdater:
         for job in self.scheduler.get_jobs():
             logger.info(f"Job: {job.name} (ID: {job.id}) - next run: {job.next_run_time}")
 
+    # Остановка планировщика
+
     def stop(self):
-        """Остановка планировщика"""
         self.scheduler.shutdown()
         logger.info("Scheduler stopped")
 
+    # Получение статуса последних операций
+
     def get_status(self):
-        """Получение статуса последних операций"""
         return {
             "last_data_update": self.last_update_status,
             "last_model_retrain": self.last_retrain_status,
@@ -301,6 +303,5 @@ class DataUpdater:
                 "weekly_model_retrain").next_run_time if self.scheduler.get_job("weekly_model_retrain") else None,
             "is_running": self.scheduler.running
         }
-
 
 data_updater = DataUpdater()

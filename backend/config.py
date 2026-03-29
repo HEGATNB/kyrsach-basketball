@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List
 import secrets
 
-# Загружаем env (файл без точки)
 BASE_DIR = Path(__file__).resolve().parent
 env_path = BASE_DIR / 'env'
 if env_path.exists():
@@ -16,21 +15,21 @@ else:
 
 
 class Config:
-    # База данных - читаем из переменных окружения
     DB_NAME = os.getenv("DB_NAME")
     DB_USER = os.getenv("DB_USER")
     DB_PASSWORD = os.getenv("DB_PASSWORD")
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = os.getenv("DB_PORT", "5432")
 
+    # Создание url для подключения к базе
     @property
     def DATABASE_URL(self) -> str:
-        """Формирует URL для подключения к БД"""
         if all([self.DB_NAME, self.DB_USER, self.DB_PASSWORD]):
             return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         return os.getenv("DATABASE_URL", "")
 
     # JWT настройки
+
     JWT_SECRET = os.getenv("JWT_SECRET")
     if not JWT_SECRET and os.getenv("ENVIRONMENT") == "production":
         raise ValueError("JWT_SECRET must be set in production!")
@@ -41,11 +40,13 @@ class Config:
     JWT_EXPIRES_IN = os.getenv("JWT_EXPIRES_IN", "7d")
 
     # Пути
+
     BASE_DIR = Path(__file__).resolve().parent
     MODEL_DIR = os.getenv("MODEL_DIR", str(BASE_DIR / "models"))
     DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "nba.sqlite"))
 
     # Настройки нейросети
+
     STATS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'pf', 'fg_pct', 'fg3_pct', 'ft_pct']
 
     # Окружение
@@ -75,9 +76,11 @@ class Config:
 
 
 # Создаем глобальный экземпляр
+
 config = Config()
 
 # Проверяем критичные настройки в продакшене
+
 if config.is_production:
     if not config.DATABASE_URL:
         raise ValueError("DATABASE_URL must be set in production!")

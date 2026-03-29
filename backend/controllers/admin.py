@@ -1,4 +1,3 @@
-# controllers/admin.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -13,13 +12,12 @@ import schemas
 
 router = APIRouter()
 
-
+# Статистика админ панели
 @router.get("/stats")
 async def get_admin_stats(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение статистики для админ-панели"""
     await require_admin(request)
 
     try:
@@ -89,7 +87,6 @@ async def get_all_users(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение списка всех пользователей"""
     await require_admin(request)
 
     try:
@@ -127,7 +124,6 @@ async def toggle_user_block(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Блокировка/разблокировка пользователя"""
     await require_admin(request)
 
     try:
@@ -193,14 +189,13 @@ async def toggle_user_block(
             detail=f"Error updating user: {str(e)}"
         )
 
-
+# Роут для получения логов аудита
 @router.get("/logs", response_model=List[schemas.AuditLogResponse])
 async def get_audit_logs(
         request: Request,
         limit: int = 100,
         db: Session = Depends(get_db)
 ):
-    """Получение логов аудита"""
     await require_admin(request)
 
     try:
@@ -221,7 +216,6 @@ async def create_backup(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Создание бэкапа"""
     await require_admin(request)
 
     try:
@@ -312,7 +306,6 @@ async def get_backups(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение списка бэкапов"""
     await require_admin(request)
 
     try:
@@ -352,7 +345,6 @@ async def restore_backup(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Восстановление из бэкапа"""
     await require_admin(request)
 
     try:
@@ -428,7 +420,6 @@ async def restore_backup(
 
             db.commit()
 
-        # Логируем действие
         audit = AuditService(db)
         audit.log(
             user_id=(await require_admin(request)).user_id,
@@ -453,7 +444,6 @@ async def restore_backup(
 
 
 def check_table_exists(db: Session, table_name: str) -> bool:
-    """Проверяет существование таблицы"""
     try:
         result = db.execute(
             text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"),
@@ -465,7 +455,6 @@ def check_table_exists(db: Session, table_name: str) -> bool:
 
 
 def create_backups_table(db: Session):
-    """Создает таблицу для хранения информации о бэкапах"""
     try:
         db.execute(text("""
             CREATE TABLE IF NOT EXISTS backups (

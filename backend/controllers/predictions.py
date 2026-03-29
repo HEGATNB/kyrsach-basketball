@@ -1,4 +1,3 @@
-# predictions.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
@@ -13,15 +12,12 @@ import schemas
 
 router = APIRouter()
 
-
-# controllers/predictions.py
 @router.post("/predict", response_model=schemas.PredictionResponse)
 async def predict(
         prediction_data: schemas.PredictionRequest,
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Создание прогноза на матч (требует авторизации)"""
     try:
         print("=" * 60)
         print("🔮 НАЧАЛО ПРЕДСКАЗАНИЯ")
@@ -82,8 +78,6 @@ async def predict(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Ошибка при создании прогноза: {str(e)}"
             )
-
-        # Логирование
         print("📝 Логирование действия...")
         audit_svc.log(
             user_id=user_data.user_id,
@@ -153,7 +147,6 @@ async def get_my_predictions(
         limit: int = 50,
         db: Session = Depends(get_db)
 ):
-    """Получение истории прогнозов текущего пользователя (требует авторизации)"""
     user_data = await get_current_user(request)
     if not user_data:
         raise HTTPException(
@@ -176,7 +169,6 @@ async def get_prediction_by_id(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение прогноза по ID (требует авторизации)"""
     user_data = await get_current_user(request)
     if not user_data:
         raise HTTPException(
@@ -192,7 +184,6 @@ async def get_prediction_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Прогноз с ID {prediction_id} не найден"
         )
-
     # Проверка прав доступа
     if prediction.get("user_id") != user_data.user_id and user_data.role != "admin":
         raise HTTPException(
@@ -209,7 +200,6 @@ async def train_on_match(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Обучение модели на реальном результате матча (только для админов)"""
     user_data = await require_admin(request)
 
     ai_svc = AIService(db)

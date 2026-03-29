@@ -1,4 +1,3 @@
-# controllers/matches.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -19,7 +18,6 @@ async def get_all_matches(
         limit: int = Query(100, ge=1, le=1000),
         db: Session = Depends(get_db)
 ):
-    """Получение списка матчей с фильтрацией"""
     try:
         match_service = MatchService(db)
 
@@ -54,7 +52,6 @@ async def get_match_by_id(
         match_id: int,
         db: Session = Depends(get_db)
 ):
-    """Получение матча по ID"""
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)

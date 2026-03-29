@@ -1,4 +1,3 @@
-# train_model.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
@@ -76,9 +75,8 @@ ALPHA = 0.18
 WEIGHT_DECAY_DAYS = 500
 
 
-# ========== ФУНКЦИИ РАБОТЫ С БД ==========
+# Подключение к базе
 def get_db_connection():
-    """Создает подключение к PostgreSQL"""
     print(f"\n🔌 Попытка подключения к БД...")
     try:
         conn = psycopg2.connect(
@@ -95,9 +93,9 @@ def get_db_connection():
         print(f"❌ Ошибка подключения: {e}")
         raise
 
+# Парсер данных разных форматов
 
 def safe_parse_date(date_str):
-    """Безопасный парсинг даты из разных форматов"""
     if pd.isna(date_str) or date_str is None:
         return None
 
@@ -229,9 +227,9 @@ def load_games():
 
     return df
 
+# Расчет средних значений
 
 def compute_global_averages(df):
-    """Compute global average for each stat"""
     global_avg = {}
     for stat in STATS:
         home_col = f'{stat}_home'
@@ -255,14 +253,8 @@ def compute_global_averages(df):
 
 
 def preprocess_and_build_dataset(df):
-    """
-    Iterate through games in chronological order.
-    For each game, use current EMA of home and away as features,
-    then update EMA with actual game stats.
-    """
     print("🔄 Предобработка данных...")
 
-    # Fill missing numeric stats with 0
     for stat in STATS:
         home_col = f'{stat}_home'
         away_col = f'{stat}_away'
@@ -323,7 +315,6 @@ def preprocess_and_build_dataset(df):
         weights.append(weight)
         game_dates.append(game_date)
 
-        # Update home team's EMA
         actual_home = {}
         for stat in STATS:
             col = f'{stat}_home'
@@ -335,7 +326,6 @@ def preprocess_and_build_dataset(df):
             new_home_ema[stat] = ALPHA * actual_home[stat] + (1 - ALPHA) * home_ema[stat]
         team_emas[home_id] = new_home_ema
 
-        # Update away team's EMA
         actual_away = {}
         for stat in STATS:
             col = f'{stat}_away'
@@ -357,7 +347,7 @@ def preprocess_and_build_dataset(df):
     return X, y, weights, team_emas, game_dates
 
 
-# ========== МОДЕЛЬ ==========
+# Создание модели
 def build_model(input_dim):
     model = keras.Sequential([
         layers.Dense(64, activation='relu', input_shape=(input_dim,)),
@@ -371,7 +361,7 @@ def build_model(input_dim):
     return model
 
 
-# ========== ОБУЧЕНИЕ ==========
+# Обучение модели
 def train_model(db_path=None):
     print("=" * 60)
     print("🔄 ЗАПУСК ОБУЧЕНИЯ МОДЕЛИ")

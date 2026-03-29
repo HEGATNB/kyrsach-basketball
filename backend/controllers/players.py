@@ -1,4 +1,3 @@
-# controllers/players.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
@@ -25,7 +24,6 @@ async def get_all_players(
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db)
 ):
-    """Получение списка всех игроков со статистикой"""
     logger.info(f"Players request: team={team}, season={season}, search={search}")
 
     try:
@@ -56,7 +54,6 @@ async def get_all_players(
 
 @router.get("/seasons", response_model=List[str])
 async def get_seasons(db: Session = Depends(get_db)):
-    """Получение списка всех доступных сезонов"""
     try:
         player_service = PlayerService(db)
         return player_service.get_seasons()
@@ -75,7 +72,6 @@ async def get_top_players(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db)
 ):
-    """Получение топ-игроков по категории"""
     logger.info(f"Top players request: category={category}, min_games={min_games}")
 
     try:
@@ -100,7 +96,6 @@ async def get_player_by_id(
     player_id: int,
     db: Session = Depends(get_db)
 ):
-    """Получение игрока по ID"""
     logger.info(f"Player by ID request: {player_id}")
 
     try:
@@ -131,7 +126,6 @@ async def get_players_by_team(
     team_abbrev: str,
     db: Session = Depends(get_db)
 ):
-    """Получение игроков конкретной команды по аббревиатуре"""
     logger.info(f"Players by team request: {team_abbrev}")
 
     try:

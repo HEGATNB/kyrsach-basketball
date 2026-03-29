@@ -1,4 +1,3 @@
-# scripts/load_players.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
@@ -17,7 +16,6 @@ DB_PORT = config.DB_PORT
 
 
 def get_db_connection():
-    """Создает подключение к PostgreSQL"""
     conn = psycopg2.connect(
         dbname=DB_NAME,
         user=DB_USER,
@@ -30,7 +28,6 @@ def get_db_connection():
 
 
 def check_players_table():
-    """Проверяет наличие таблицы players и её структуру"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -66,7 +63,6 @@ def check_players_table():
 
 
 def load_players_from_csv(csv_path):
-    """Загружает игроков из CSV файла в таблицу players"""
     try:
         if not os.path.exists(csv_path):
             print(f"❌ Файл {csv_path} не найден")
@@ -125,7 +121,6 @@ def load_players_from_csv(csv_path):
 
 
 def load_from_common_player_info():
-    """Проверка наличия данных в common_player_info"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -149,7 +144,6 @@ def load_from_common_player_info():
 
 
 def get_player_stats_summary():
-    """Получает статистику по игрокам"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()

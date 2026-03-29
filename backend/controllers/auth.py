@@ -1,4 +1,3 @@
-# controllers/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -19,14 +18,12 @@ class LoginRequest:
         self.password = password
         self.identifier = identifier
 
-
-# controllers/auth.py
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Вход в систему - принимает JSON с любыми полями"""
+    # вход принимает json с любыми полями
     try:
         # Получаем тело запроса как dict
         body = await request.json()
@@ -53,7 +50,7 @@ async def login(
         if "@" in identifier:
             user = service.authenticate_user(identifier, password)
         else:
-            # Пробуем найти по имени пользователя (username)
+            # Пробуем найти пользователя по имени
             from sqlalchemy import text
             result = db.execute(
                 text("SELECT id, email, name, username, role, password_hash, is_blocked, created_at FROM users WHERE username = :username OR name = :name"),
@@ -120,7 +117,7 @@ async def login(
             created_at=user.get("created_at", datetime.utcnow())
         )
 
-        # Возвращаем токен в поле "token" как ожидает фронтенд
+        # Возвращаем токен в поле "token"
         return {
             "token": token,
             "token_type": "bearer",
@@ -144,7 +141,6 @@ async def register(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Регистрация нового пользователя"""
     try:
         # Получаем тело запроса
         body = await request.json()
@@ -170,7 +166,6 @@ async def register(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Пользователь с таким email уже существует"
             )
-
         # Создание пользователя
         user = service.create_user({
             "email": email,
@@ -179,7 +174,6 @@ async def register(
             "username": username,
             "role": "user"
         })
-
         # Логирование
         try:
             audit = AuditService(db)
@@ -220,7 +214,6 @@ async def get_current_user_info(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение информации о текущем пользователе"""
     from middleware.auth import get_current_user
 
     try:
@@ -271,7 +264,6 @@ async def get_current_user_info(
 
 @router.post("/init")
 async def init_database(db: Session = Depends(get_db)):
-    """Инициализация базы данных тестовыми пользователями"""
     try:
         print("🚀 Инициализация базы данных тестовыми пользователями")
         service = AuthService(db)
@@ -293,7 +285,6 @@ async def init_database(db: Session = Depends(get_db)):
 
 @router.post("/logout")
 async def logout(request: Request, db: Session = Depends(get_db)):
-    """Выход из системы"""
     from middleware.auth import get_current_user
 
     try:

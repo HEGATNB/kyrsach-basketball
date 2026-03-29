@@ -1,4 +1,3 @@
-# middleware/auth.py
 from fastapi import Request, HTTPException, status
 from fastapi.security import HTTPBearer
 import sys
@@ -9,9 +8,8 @@ from scripts.auth import verify_token, TokenPayload
 
 security = HTTPBearer()
 
-
+# получение пользователя из токена
 async def get_current_user(request: Request):
-    """Получение текущего пользователя из токена"""
     authorization = request.headers.get("Authorization")
 
     if not authorization:
@@ -34,9 +32,9 @@ async def get_current_user(request: Request):
 
     return payload
 
+# Проверка администратора
 
 async def require_admin(request: Request):
-    """Проверка роли admin"""
     user = await get_current_user(request)
     if not user:
         raise HTTPException(
@@ -51,9 +49,9 @@ async def require_admin(request: Request):
         )
     return user
 
+# Проверка оператора
 
 async def require_admin_or_operator(request: Request):
-    """Проверка роли admin или operator"""
     user = await get_current_user(request)
     if not user:
         raise HTTPException(
