@@ -1,5 +1,4 @@
-# main.py - полная исправленная версия
-
+from controllers import admin
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,24 +11,14 @@ from tensorflow.keras.models import load_model
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
-
-# Импортируем контроллеры из папки controllers
 from controllers import auth, teams, matches, predictions, players
-
-# Импортируем функции из скриптов
 from scripts.update_data import update_db_with_new_games
 from scripts.train_model import train_model
-
-# Импортируем database
 from database import engine, Base, get_db
 from sqlalchemy.orm import Session
-
-# Импортируем планировщик
 from scheduler import data_updater
-import atexit
-
-# Импортируем сервис для метрик
 from services.model_metrics_service import ModelMetricsService
+import atexit
 
 app = FastAPI(
     title="HoopsAI API",
@@ -37,7 +26,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS - правильно настроенный
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -51,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ НЕЙРОСЕТИ ==========
+# Переменные для нейросети
 model = None
 scaler = None
 team_emas = {}
@@ -60,7 +49,7 @@ STATS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'pf', 'fg_pct', 'fg3_pct', 'f
 MODEL_DIR = "./models"
 
 
-# ========== МОДЕЛИ ДЛЯ НЕЙРОСЕТИ ==========
+
 class NeuralPredictionRequest(BaseModel):
     home_team: str
     away_team: str
@@ -72,7 +61,7 @@ class NeuralPredictionResponse(BaseModel):
     home_win_probability: float
 
 
-# ========== ЗАГРУЗКА НЕЙРОСЕТИ ПРИ СТАРТЕ ==========
+# Загрузка нейросети
 @app.on_event("startup")
 def load_artifacts():
     global model, scaler, team_emas, teams_df
@@ -99,7 +88,6 @@ def load_artifacts():
 
 @app.on_event("startup")
 async def start_scheduler():
-    """Запуск планировщика при старте приложения"""
     try:
         data_updater.start()
         print("Scheduler started")
@@ -109,7 +97,6 @@ async def start_scheduler():
 
 @app.on_event("shutdown")
 async def shutdown_scheduler():
-    """Остановка планировщика при завершении приложения"""
     try:
         data_updater.stop()
         print("Scheduler stopped")
@@ -117,11 +104,10 @@ async def shutdown_scheduler():
         print(f"Error stopping scheduler: {e}")
 
 
-# ========== ЭНДПОИНТЫ ДЛЯ НЕЙРОСЕТИ ==========
+# Эндпоинты для нейросети
 @app.get("/api/neural/teams")
 @app.get("/neural/teams")
 def get_neural_teams():
-    """Список команд для нейросети"""
     if teams_df is None:
         raise HTTPException(status_code=503, detail="Neural network not loaded")
     return teams_df[['team_abbrev', 'team_name']].drop_duplicates().to_dict(orient='records')
@@ -130,7 +116,6 @@ def get_neural_teams():
 @app.post("/api/neural/predict")
 @app.post("/neural/predict")
 def neural_predict(request: NeuralPredictionRequest):
-    """Предсказание от нейросети"""
     if model is None or scaler is None or teams_df is None:
         raise HTTPException(status_code=503, detail="Neural network not loaded")
 
@@ -169,13 +154,11 @@ def neural_predict(request: NeuralPredictionRequest):
 @app.post("/api/neural/retrain")
 @app.post("/neural/retrain")
 async def neural_retrain(background_tasks: BackgroundTasks):
-    """Переобучение нейросети в фоне"""
     background_tasks.add_task(retrain_task)
     return {"message": "Retraining started in background. This may take several minutes."}
 
 
 async def retrain_task():
-    """Фоновая задача для переобучения"""
     try:
         loop = asyncio.get_event_loop()
         print("Starting data update...")
@@ -189,10 +172,9 @@ async def retrain_task():
         print(f"Error during retraining: {e}")
 
 
-# ========== ЭНДПОИНТЫ ДЛЯ МЕТРИК МОДЕЛИ ==========
+# Эндпоинты со статистикой модели
 @app.get("/api/model/metrics/latest")
 async def get_latest_model_metrics():
-    """Получение последних метрик модели"""
     try:
         from database import SessionLocal
         db = SessionLocal()
@@ -209,7 +191,6 @@ async def get_latest_model_metrics():
 
 @app.get("/api/model/metrics/history")
 async def get_model_metrics_history(limit: int = 10):
-    """Получение истории метрик модели"""
     try:
         from database import SessionLocal
         db = SessionLocal()
@@ -223,7 +204,6 @@ async def get_model_metrics_history(limit: int = 10):
 
 @app.get("/api/model/metrics/stats")
 async def get_model_stats():
-    """Получение статистики по моделям"""
     try:
         from database import SessionLocal
         db = SessionLocal()
@@ -235,10 +215,9 @@ async def get_model_stats():
         raise HTTPException(status_code=500, detail=f"Error getting stats: {str(e)}")
 
 
-# ========== АДМИНСКИЕ ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ ОБНОВЛЕНИЯМИ ==========
+# Эндпоинты для администраторов
 @app.get("/api/admin/update-status")
 async def get_update_status(request: Request):
-    """Получение статуса последнего обновления (только для админов)"""
     from middleware.auth import require_admin
     await require_admin(request)
 
@@ -247,7 +226,6 @@ async def get_update_status(request: Request):
 
 @app.post("/api/admin/force-data-update")
 async def force_data_update(request: Request):
-    """Принудительное обновление данных (только для админов)"""
     from middleware.auth import require_admin
     await require_admin(request)
 
@@ -261,7 +239,6 @@ async def force_data_update(request: Request):
 
 @app.post("/api/admin/force-model-retrain")
 async def force_model_retrain(request: Request):
-    """Принудительное переобучение модели (только для админов)"""
     from middleware.auth import require_admin
     await require_admin(request)
 
@@ -273,11 +250,10 @@ async def force_model_retrain(request: Request):
     }
 
 
-# ========== HEALTH CHECK ==========
+# Проверка работы API
 @app.get("/api/health")
 @app.get("/health")
 async def health_check():
-    """Проверка работоспособности API"""
     db_status = "unknown"
     try:
         from database import SessionLocal
@@ -297,12 +273,9 @@ async def health_check():
         "scheduler_running": data_updater.scheduler.running if hasattr(data_updater, 'scheduler') else False
     }
 
-
-# ========== ПРОВЕРКА БАЗЫ ДАННЫХ ==========
 @app.get("/api/debug/db-check")
 @app.get("/debug/db-check")
 async def check_database():
-    """Проверка подключения к PostgreSQL"""
     try:
         from database import SessionLocal
         db = SessionLocal()
@@ -352,15 +325,16 @@ async def check_database():
         }
 
 
-# ========== ПОДКЛЮЧАЕМ КОНТРОЛЛЕРЫ ==========
-# Подключаем с правильными префиксами - без трейлинг слэшей
+# ПОДКЛЮЧЕНИЕ КОНТРОЛЛЕРОВ
+
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(predictions.router, prefix="/api", tags=["predictions"])
 app.include_router(players.router, prefix="/api/players", tags=["players"])
 
-# Дублируем роуты без /api для обратной совместимости
+# РОУТЫ БЕЗ API
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(teams.router, prefix="/teams", tags=["teams"])
 app.include_router(matches.router, prefix="/matches", tags=["matches"])
@@ -368,7 +342,6 @@ app.include_router(predictions.router, prefix="", tags=["predictions"])
 app.include_router(players.router, prefix="/players", tags=["players"])
 
 
-# ========== КОРНЕВОЙ ЭНДПОИНТ ==========
 @app.get("/")
 async def root():
     return {

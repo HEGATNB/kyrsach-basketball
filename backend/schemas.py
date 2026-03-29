@@ -207,7 +207,6 @@ class ModelStatsResponse(BaseModel):
     lastUpdated: str
 
 
-# Audit schemas
 class AuditLogResponse(BaseModel):
     id: str
     action: str
@@ -215,6 +214,17 @@ class AuditLogResponse(BaseModel):
     details: Optional[dict]
     createdAt: str
     user: Optional[dict]
+
+    class Config:
+        from_attributes = True
+
+class BackupResponse(BaseModel):
+    id: str
+    filename: str
+    size: int
+    type: str
+    status: str
+    createdAt: Optional[str]
 
     class Config:
         from_attributes = True
