@@ -1,15 +1,14 @@
-﻿# frontend/Dockerfile
-FROM node:18-alpine
+﻿FROM node:18-alpine
+
 WORKDIR /app
 
-# Копируем package.json и package-lock.json
-COPY package.json package-lock.json ./
-
-# Устанавливаем зависимости
+# Копируем package.json и устанавливаем зависимости
+COPY package*.json ./
 RUN npm ci
 
-# Копируем остальной код
+# Копируем исходный код
 COPY . .
 
-# Запускаем dev сервер
+EXPOSE 5173
+
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

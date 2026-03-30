@@ -1,40 +1,62 @@
 ﻿version: '3.8'
 
 services:
-  frontend:
-    build: ./frontend  # строим из директории frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://backend:8000
-    depends_on:
-      - backend
-    volumes:
-      - ./frontend:/app  # для hot reload в development
-      - /app/node_modules
-
-  backend:
-    build: ./backend    # строим из директории backend
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://user:password@db/hoopstat_db
-    depends_on:
-      - db
-    volumes:
-      - ./backend:/app  # для hot reload
-
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: hoopstat_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nba
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/postgres/init:/docker-entrypoint-initdb.d  # добавляем эту строку
     ports:
-      - "5432:5432"  # опционально: открыть порт для внешнего доступа
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_NAME=nba
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - JWT_SECRET=hzIoUfN8qA5t535Rpv_jvyzul5aRLwxLPJIxcINBCx4
+      - JWT_EXPIRES_IN=7d
+      - ENVIRONMENT=development
+      - MODEL_DIR=/app/models
+      - DB_PATH=/app/nba.sqlite
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+      - /app/.venv
+      - backend_models:/app/models
+      - backend_backups:/app/backups
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_PROXY_TARGET=http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/dist
 
 volumes:
   postgres_data:
+  backend_models:
+  backend_backups:

@@ -1,3 +1,4 @@
+# backend/config.py
 import os
 from dotenv import load_dotenv
 from pathlib import Path
@@ -15,13 +16,13 @@ else:
 
 
 class Config:
-    DB_NAME = os.getenv("DB_NAME")
-    DB_USER = os.getenv("DB_USER")
-    DB_PASSWORD = os.getenv("DB_PASSWORD")
+    # База данных
+    DB_NAME = os.getenv("DB_NAME", "nba")
+    DB_USER = os.getenv("DB_USER", "postgres")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = os.getenv("DB_PORT", "5432")
 
-    # Создание url для подключения к базе
     @property
     def DATABASE_URL(self) -> str:
         if all([self.DB_NAME, self.DB_USER, self.DB_PASSWORD]):
@@ -29,7 +30,6 @@ class Config:
         return os.getenv("DATABASE_URL", "")
 
     # JWT настройки
-
     JWT_SECRET = os.getenv("JWT_SECRET")
     if not JWT_SECRET and os.getenv("ENVIRONMENT") == "production":
         raise ValueError("JWT_SECRET must be set in production!")
@@ -40,13 +40,11 @@ class Config:
     JWT_EXPIRES_IN = os.getenv("JWT_EXPIRES_IN", "7d")
 
     # Пути
-
     BASE_DIR = Path(__file__).resolve().parent
     MODEL_DIR = os.getenv("MODEL_DIR", str(BASE_DIR / "models"))
     DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "nba.sqlite"))
 
     # Настройки нейросети
-
     STATS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'pf', 'fg_pct', 'fg3_pct', 'ft_pct']
 
     # Окружение
@@ -75,11 +73,7 @@ class Config:
         return self.ENVIRONMENT == "production"
 
 
-# Создаем глобальный экземпляр
-
 config = Config()
-
-# Проверяем критичные настройки в продакшене
 
 if config.is_production:
     if not config.DATABASE_URL:
