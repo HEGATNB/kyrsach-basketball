@@ -157,6 +157,10 @@ def fetch_detailed_stats(game_id):
 
 
 def update_existing_games(conn, days_back=2):
+    """
+    Обновляет результаты существующих матчей за последние дни.
+    Особенно важно для матчей, которые были в статусе scheduled и теперь завершились.
+    """
     print(f"\n{'=' * 60}")
     print("🔄 ОБНОВЛЕНИЕ РЕЗУЛЬТАТОВ ЗАВЕРШИВШИХСЯ МАТЧЕЙ")
     print(f"📅 Проверяем матчи за последние {days_back} дней")
@@ -171,14 +175,14 @@ def update_existing_games(conn, days_back=2):
         date = today - timedelta(days=i)
         print(f"\n📅 Проверка матчей за {date}")
 
-        # Получаем матчи за эту дату, которые еще не имеют результата (scheduled)
+        # Исправленный запрос - используем %s вместо :date и DATE() вместо ::date
         cursor.execute("""
             SELECT game_id, team_id_home, team_id_away, team_abbreviation_home, team_abbreviation_away,
                    team_name_home, team_name_away, pts_home, pts_away, wl_home, wl_away
             FROM game
-            WHERE game_date::date = :date
+            WHERE DATE(game_date) = %s
               AND (pts_home IS NULL OR pts_away IS NULL)
-        """, {"date": date})
+        """, (date,))
 
         pending_games = cursor.fetchall()
 
@@ -258,96 +262,89 @@ def update_existing_games(conn, days_back=2):
             def safe_pct(made, att):
                 return round(made / att, 3) if att and att > 0 else 0
 
+            # Исправленный UPDATE запрос - используем %s вместо :param
             try:
                 cursor.execute("""
                     UPDATE game SET
-                        pts_home = :pts_home, 
-                        pts_away = :pts_away,
-                        wl_home = :wl_home, 
-                        wl_away = :wl_away,
-                        fgm_home = :fgm_home, 
-                        fga_home = :fga_home, 
-                        fg_pct_home = :fg_pct_home,
-                        fg3m_home = :fg3m_home, 
-                        fg3a_home = :fg3a_home, 
-                        fg3_pct_home = :fg3_pct_home,
-                        ftm_home = :ftm_home, 
-                        fta_home = :fta_home, 
-                        ft_pct_home = :ft_pct_home,
-                        oreb_home = :oreb_home, 
-                        dreb_home = :dreb_home, 
-                        reb_home = :reb_home,
-                        ast_home = :ast_home, 
-                        stl_home = :stl_home, 
-                        blk_home = :blk_home,
-                        tov_home = :tov_home, 
-                        pf_home = :pf_home,
-                        fgm_away = :fgm_away, 
-                        fga_away = :fga_away, 
-                        fg_pct_away = :fg_pct_away,
-                        fg3m_away = :fg3m_away, 
-                        fg3a_away = :fg3a_away, 
-                        fg3_pct_away = :fg3_pct_away,
-                        ftm_away = :ftm_away, 
-                        fta_away = :fta_away, 
-                        ft_pct_away = :ft_pct_away,
-                        oreb_away = :oreb_away, 
-                        dreb_away = :dreb_away, 
-                        reb_away = :reb_away,
-                        ast_away = :ast_away, 
-                        stl_away = :stl_away, 
-                        blk_away = :blk_away,
-                        tov_away = :tov_away, 
-                        pf_away = :pf_away,
+                        pts_home = %s, 
+                        pts_away = %s,
+                        wl_home = %s, 
+                        wl_away = %s,
+                        fgm_home = %s, 
+                        fga_home = %s, 
+                        fg_pct_home = %s,
+                        fg3m_home = %s, 
+                        fg3a_home = %s, 
+                        fg3_pct_home = %s,
+                        ftm_home = %s, 
+                        fta_home = %s, 
+                        ft_pct_home = %s,
+                        oreb_home = %s, 
+                        dreb_home = %s, 
+                        reb_home = %s,
+                        ast_home = %s, 
+                        stl_home = %s, 
+                        blk_home = %s,
+                        tov_home = %s, 
+                        pf_home = %s,
+                        fgm_away = %s, 
+                        fga_away = %s, 
+                        fg_pct_away = %s,
+                        fg3m_away = %s, 
+                        fg3a_away = %s, 
+                        fg3_pct_away = %s,
+                        ftm_away = %s, 
+                        fta_away = %s, 
+                        ft_pct_away = %s,
+                        oreb_away = %s, 
+                        dreb_away = %s, 
+                        reb_away = %s,
+                        ast_away = %s, 
+                        stl_away = %s, 
+                        blk_away = %s,
+                        tov_away = %s, 
+                        pf_away = %s,
                         updated_at = CURRENT_TIMESTAMP
-                    WHERE game_id = :game_id
-                """, {
-                    "game_id": game_data["game_id"],
-                    "pts_home": home_score,
-                    "pts_away": away_score,
-                    "wl_home": 'W' if home_win else 'L',
-                    "wl_away": 'L' if home_win else 'W',
-                    "fgm_home": home_stats.get('fieldGoalsMade', 0),
-                    "fga_home": home_stats.get('fieldGoalsAttempted', 0),
-                    "fg_pct_home": safe_pct(home_stats.get('fieldGoalsMade', 0),
-                                            home_stats.get('fieldGoalsAttempted', 0)),
-                    "fg3m_home": home_stats.get('threePointFieldGoalsMade', 0),
-                    "fg3a_home": home_stats.get('threePointFieldGoalsAttempted', 0),
-                    "fg3_pct_home": safe_pct(home_stats.get('threePointFieldGoalsMade', 0),
-                                             home_stats.get('threePointFieldGoalsAttempted', 0)),
-                    "ftm_home": home_stats.get('freeThrowsMade', 0),
-                    "fta_home": home_stats.get('freeThrowsAttempted', 0),
-                    "ft_pct_home": safe_pct(home_stats.get('freeThrowsMade', 0),
-                                            home_stats.get('freeThrowsAttempted', 0)),
-                    "oreb_home": home_stats.get('offensiveRebounds', 0),
-                    "dreb_home": home_stats.get('defensiveRebounds', 0),
-                    "reb_home": home_stats.get('rebounds', 0),
-                    "ast_home": home_stats.get('assists', 0),
-                    "stl_home": home_stats.get('steals', 0),
-                    "blk_home": home_stats.get('blocks', 0),
-                    "tov_home": home_stats.get('turnovers', 0),
-                    "pf_home": home_stats.get('fouls', 0),
-                    "fgm_away": away_stats.get('fieldGoalsMade', 0),
-                    "fga_away": away_stats.get('fieldGoalsAttempted', 0),
-                    "fg_pct_away": safe_pct(away_stats.get('fieldGoalsMade', 0),
-                                            away_stats.get('fieldGoalsAttempted', 0)),
-                    "fg3m_away": away_stats.get('threePointFieldGoalsMade', 0),
-                    "fg3a_away": away_stats.get('threePointFieldGoalsAttempted', 0),
-                    "fg3_pct_away": safe_pct(away_stats.get('threePointFieldGoalsMade', 0),
-                                             away_stats.get('threePointFieldGoalsAttempted', 0)),
-                    "ftm_away": away_stats.get('freeThrowsMade', 0),
-                    "fta_away": away_stats.get('freeThrowsAttempted', 0),
-                    "ft_pct_away": safe_pct(away_stats.get('freeThrowsMade', 0),
-                                            away_stats.get('freeThrowsAttempted', 0)),
-                    "oreb_away": away_stats.get('offensiveRebounds', 0),
-                    "dreb_away": away_stats.get('defensiveRebounds', 0),
-                    "reb_away": away_stats.get('rebounds', 0),
-                    "ast_away": away_stats.get('assists', 0),
-                    "stl_away": away_stats.get('steals', 0),
-                    "blk_away": away_stats.get('blocks', 0),
-                    "tov_away": away_stats.get('turnovers', 0),
-                    "pf_away": away_stats.get('fouls', 0),
-                })
+                    WHERE game_id = %s
+                """, (
+                    home_score, away_score,
+                    'W' if home_win else 'L', 'L' if home_win else 'W',
+                    home_stats.get('fieldGoalsMade', 0),
+                    home_stats.get('fieldGoalsAttempted', 0),
+                    safe_pct(home_stats.get('fieldGoalsMade', 0), home_stats.get('fieldGoalsAttempted', 0)),
+                    home_stats.get('threePointFieldGoalsMade', 0),
+                    home_stats.get('threePointFieldGoalsAttempted', 0),
+                    safe_pct(home_stats.get('threePointFieldGoalsMade', 0), home_stats.get('threePointFieldGoalsAttempted', 0)),
+                    home_stats.get('freeThrowsMade', 0),
+                    home_stats.get('freeThrowsAttempted', 0),
+                    safe_pct(home_stats.get('freeThrowsMade', 0), home_stats.get('freeThrowsAttempted', 0)),
+                    home_stats.get('offensiveRebounds', 0),
+                    home_stats.get('defensiveRebounds', 0),
+                    home_stats.get('rebounds', 0),
+                    home_stats.get('assists', 0),
+                    home_stats.get('steals', 0),
+                    home_stats.get('blocks', 0),
+                    home_stats.get('turnovers', 0),
+                    home_stats.get('fouls', 0),
+                    away_stats.get('fieldGoalsMade', 0),
+                    away_stats.get('fieldGoalsAttempted', 0),
+                    safe_pct(away_stats.get('fieldGoalsMade', 0), away_stats.get('fieldGoalsAttempted', 0)),
+                    away_stats.get('threePointFieldGoalsMade', 0),
+                    away_stats.get('threePointFieldGoalsAttempted', 0),
+                    safe_pct(away_stats.get('threePointFieldGoalsMade', 0), away_stats.get('threePointFieldGoalsAttempted', 0)),
+                    away_stats.get('freeThrowsMade', 0),
+                    away_stats.get('freeThrowsAttempted', 0),
+                    safe_pct(away_stats.get('freeThrowsMade', 0), away_stats.get('freeThrowsAttempted', 0)),
+                    away_stats.get('offensiveRebounds', 0),
+                    away_stats.get('defensiveRebounds', 0),
+                    away_stats.get('rebounds', 0),
+                    away_stats.get('assists', 0),
+                    away_stats.get('steals', 0),
+                    away_stats.get('blocks', 0),
+                    away_stats.get('turnovers', 0),
+                    away_stats.get('fouls', 0),
+                    game_data["game_id"]
+                ))
 
                 if cursor.rowcount > 0:
                     updated_count += 1

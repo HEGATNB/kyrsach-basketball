@@ -1,6 +1,20 @@
-﻿version: '3.8'
+﻿services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app_network
 
-services:
   db:
     image: postgres:15
     environment:
@@ -16,6 +30,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - app_network
 
   backend:
     build: ./backend
@@ -27,20 +44,34 @@ services:
       - DB_PASSWORD=postgres
       - DB_HOST=db
       - DB_PORT=5432
-      - JWT_SECRET=hzIoUfN8qA5t535Rpv_jvyzul5aRLwxLPJIxcINBCx4
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-hzIoUfN8qA5t535Rpv_jvyzul5aRLwxLPJIxcINBCx4}
       - JWT_EXPIRES_IN=7d
       - ENVIRONMENT=development
       - MODEL_DIR=/app/models
       - DB_PATH=/app/nba.sqlite
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - NO_PROXY=localhost,127.0.0.1,db,redis
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./backend:/app
       - /app/__pycache__
-      - /app/.venv
       - backend_models:/app/models
       - backend_backups:/app/backups
+    restart: unless-stopped
+    networks:
+      - app_network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build: ./frontend
@@ -55,8 +86,19 @@ services:
       - ./frontend:/app
       - /app/node_modules
       - /app/dist
+    restart: unless-stopped
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
 
 volumes:
   postgres_data:
+  redis_data:
   backend_models:
   backend_backups:

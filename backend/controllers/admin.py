@@ -1,3 +1,4 @@
+# backend/controllers/admin.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -7,42 +8,120 @@ from typing import List, Dict, Any
 from database import get_db
 from services.audit_service import AuditService
 from services.auth_service import AuthService
+from services.redis_service import redis_service
 from middleware.auth import require_admin
 import schemas
 
 router = APIRouter()
 
-# Статистика админ панели
+
+@router.put("/users/{user_id}/block")
+async def toggle_user_block(
+        user_id: int,
+        request: Request,
+        db: Session = Depends(get_db)
+):
+    """Блокировка/разблокировка пользователя с отзывом всех токенов"""
+    await require_admin(request)
+
+    try:
+        body = await request.json()
+        is_blocked = body.get("isBlocked", False)
+
+        current_user = await require_admin(request)
+        if current_user.user_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot block yourself"
+            )
+
+        # Обновляем статус в БД
+        db.execute(
+            text("UPDATE users SET is_blocked = :is_blocked WHERE id = :user_id"),
+            {"is_blocked": is_blocked, "user_id": user_id}
+        )
+        db.commit()
+
+        # Если пользователь заблокирован - отзываем все его токены
+        if is_blocked and redis_service.is_available():
+            redis_service.revoke_all_user_tokens(user_id)
+            print(f"✅ Все токены пользователя {user_id} отозваны")
+
+        # Получаем обновленного пользователя
+        result = db.execute(
+            text("SELECT id, email, name, username, role, is_blocked, created_at FROM users WHERE id = :user_id"),
+            {"user_id": user_id}
+        ).fetchone()
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        user_data = dict(result._mapping)
+
+        # Логируем действие
+        audit = AuditService(db)
+        audit.log(
+            user_id=current_user.user_id,
+            action="BLOCK_USER" if is_blocked else "UNBLOCK_USER",
+            entity="User",
+            entity_id=user_id,
+            details={"user_id": user_id, "email": user_data["email"], "tokens_revoked": is_blocked},
+            ip_address=request.client.host if request.client else None
+        )
+
+        return schemas.UserResponse(
+            id=user_data["id"],
+            email=user_data["email"],
+            name=user_data.get("name") or user_data.get("username") or user_data["email"],
+            role=user_data["role"],
+            created_at=user_data["created_at"],
+            is_blocked=user_data["is_blocked"]
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error toggling user block: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating user: {str(e)}"
+        )
+
+
+# Остальные методы admin.py без изменений
 @router.get("/stats")
 async def get_admin_stats(
         request: Request,
         db: Session = Depends(get_db)
 ):
+    """Получение статистики для админ-панели"""
     await require_admin(request)
 
     try:
-        # Получаем количество пользователей
         total_users = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
-
-        # Получаем количество команд
         total_teams = db.execute(text("SELECT COUNT(*) FROM team")).scalar()
-
-        # Получаем количество игроков
         total_players = db.execute(text("SELECT COUNT(*) FROM players")).scalar()
-
-        # Получаем количество матчей
         total_matches = db.execute(text("SELECT COUNT(*) FROM game")).scalar()
-
-        # Получаем количество прогнозов
         total_predictions = db.execute(text("SELECT COUNT(*) FROM predictions")).scalar()
 
-        # Получаем количество бэкапов
-        total_backups = db.execute(text("SELECT COUNT(*) FROM backups")).scalar() if check_table_exists(db,
-                                                                                                        "backups") else 0
+        def check_table_exists(table_name: str) -> bool:
+            try:
+                result = db.execute(
+                    text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"),
+                    {"table_name": table_name}
+                ).scalar()
+                return result
+            except:
+                return False
 
-        # Получаем точность модели из метрик
+        total_backups = db.execute(text("SELECT COUNT(*) FROM backups")).scalar() if check_table_exists("backups") else 0
+
         accuracy = None
-        if check_table_exists(db, "model_metrics"):
+        if check_table_exists("model_metrics"):
             result = db.execute(text("""
                 SELECT validation_accuracy FROM model_metrics 
                 WHERE status = 'completed' 
@@ -52,9 +131,8 @@ async def get_admin_stats(
             if result:
                 accuracy = result[0] * 100 if result[0] else None
 
-        # Получаем дату последнего бэкапа
         last_backup_at = None
-        if check_table_exists(db, "backups"):
+        if check_table_exists("backups"):
             result = db.execute(text("""
                 SELECT created_at FROM backups 
                 ORDER BY created_at DESC 
@@ -87,6 +165,7 @@ async def get_all_users(
         request: Request,
         db: Session = Depends(get_db)
 ):
+    """Получение списка всех пользователей"""
     await require_admin(request)
 
     try:
@@ -118,84 +197,13 @@ async def get_all_users(
         )
 
 
-@router.put("/users/{user_id}/block")
-async def toggle_user_block(
-        user_id: int,
-        request: Request,
-        db: Session = Depends(get_db)
-):
-    await require_admin(request)
-
-    try:
-        body = await request.json()
-        is_blocked = body.get("isBlocked", False)
-
-        # Нельзя заблокировать самого себя
-        current_user = await require_admin(request)
-        if current_user.user_id == user_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You cannot block yourself"
-            )
-
-        # Обновляем статус
-        db.execute(
-            text("UPDATE users SET is_blocked = :is_blocked WHERE id = :user_id"),
-            {"is_blocked": is_blocked, "user_id": user_id}
-        )
-        db.commit()
-
-        # Получаем обновленного пользователя
-        result = db.execute(
-            text("SELECT id, email, name, username, role, is_blocked, created_at FROM users WHERE id = :user_id"),
-            {"user_id": user_id}
-        ).fetchone()
-
-        if not result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-
-        user_data = dict(result._mapping)
-
-        # Логируем действие
-        audit = AuditService(db)
-        audit.log(
-            user_id=current_user.user_id,
-            action="BLOCK_USER" if is_blocked else "UNBLOCK_USER",
-            entity="User",
-            entity_id=user_id,
-            details={"user_id": user_id, "email": user_data["email"]},
-            ip_address=request.client.host if request.client else None
-        )
-
-        return schemas.UserResponse(
-            id=user_data["id"],
-            email=user_data["email"],
-            name=user_data.get("name") or user_data.get("username") or user_data["email"],
-            role=user_data["role"],
-            created_at=user_data["created_at"],
-            is_blocked=user_data["is_blocked"]
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        print(f"Error toggling user block: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating user: {str(e)}"
-        )
-
-# Роут для получения логов аудита
 @router.get("/logs", response_model=List[schemas.AuditLogResponse])
 async def get_audit_logs(
         request: Request,
         limit: int = 100,
         db: Session = Depends(get_db)
 ):
+    """Получение логов аудита"""
     await require_admin(request)
 
     try:
@@ -216,19 +224,38 @@ async def create_backup(
         request: Request,
         db: Session = Depends(get_db)
 ):
+    """Создание бэкапа"""
     await require_admin(request)
 
     try:
-        # Создаем таблицу для бэкапов если её нет
-        create_backups_table(db)
+        def check_table_exists(table_name: str) -> bool:
+            try:
+                result = db.execute(
+                    text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"),
+                    {"table_name": table_name}
+                ).scalar()
+                return result
+            except:
+                return False
 
-        # Собираем данные
+        if not check_table_exists("backups"):
+            db.execute(text("""
+                CREATE TABLE IF NOT EXISTS backups (
+                    id SERIAL PRIMARY KEY,
+                    filename VARCHAR(255) NOT NULL,
+                    size INTEGER,
+                    type VARCHAR(50) DEFAULT 'manual',
+                    status VARCHAR(50) DEFAULT 'completed',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+
         teams = db.execute(text("SELECT * FROM team")).fetchall()
         users = db.execute(text("SELECT id, email, name, username, role, is_blocked, created_at FROM users")).fetchall()
         matches = db.execute(text("SELECT * FROM game LIMIT 1000")).fetchall()
         predictions = db.execute(text("SELECT * FROM predictions")).fetchall()
 
-        # Создаем бэкап
         backup_data = {
             "teams": [dict(row._mapping) for row in teams],
             "users": [dict(row._mapping) for row in users],
@@ -241,7 +268,6 @@ async def create_backup(
         import json
         import os
 
-        # Сохраняем в файл
         backup_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups")
         os.makedirs(backup_dir, exist_ok=True)
 
@@ -251,7 +277,6 @@ async def create_backup(
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(backup_data, f, ensure_ascii=False, indent=2, default=str)
 
-        # Сохраняем запись в таблицу backups
         file_size = os.path.getsize(filepath)
 
         result = db.execute(
@@ -272,7 +297,6 @@ async def create_backup(
 
         backup_id = result.scalar()
 
-        # Логируем действие
         audit = AuditService(db)
         audit.log(
             user_id=(await require_admin(request)).user_id,
@@ -306,11 +330,10 @@ async def get_backups(
         request: Request,
         db: Session = Depends(get_db)
 ):
+    """Получение списка бэкапов"""
     await require_admin(request)
 
     try:
-        create_backups_table(db)
-
         result = db.execute(text("""
             SELECT id, filename, size, type, status, created_at
             FROM backups
@@ -345,10 +368,10 @@ async def restore_backup(
         request: Request,
         db: Session = Depends(get_db)
 ):
+    """Восстановление из бэкапа"""
     await require_admin(request)
 
     try:
-        # Получаем информацию о бэкапе
         result = db.execute(
             text("SELECT filename FROM backups WHERE id = :id"),
             {"id": backup_id}
@@ -375,15 +398,12 @@ async def restore_backup(
         with open(filepath, 'r', encoding='utf-8') as f:
             backup_data = json.load(f)
 
-        # Восстанавливаем данные
         if "teams" in backup_data:
-            # Очищаем таблицы перед восстановлением
             db.execute(text("TRUNCATE TABLE team RESTART IDENTITY CASCADE"))
             db.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE"))
             db.execute(text("TRUNCATE TABLE game RESTART IDENTITY CASCADE"))
             db.execute(text("TRUNCATE TABLE predictions RESTART IDENTITY CASCADE"))
 
-            # Восстанавливаем команды
             for team in backup_data["teams"]:
                 db.execute(
                     text("""
@@ -394,7 +414,6 @@ async def restore_backup(
                     team
                 )
 
-            # Восстанавливаем пользователей
             for user in backup_data["users"]:
                 db.execute(
                     text("""
@@ -405,7 +424,6 @@ async def restore_backup(
                     user
                 )
 
-            # Восстанавливаем матчи
             for match in backup_data["matches"]:
                 db.execute(
                     text("""
@@ -441,32 +459,3 @@ async def restore_backup(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error restoring backup: {str(e)}"
         )
-
-
-def check_table_exists(db: Session, table_name: str) -> bool:
-    try:
-        result = db.execute(
-            text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"),
-            {"table_name": table_name}
-        ).scalar()
-        return result
-    except:
-        return False
-
-
-def create_backups_table(db: Session):
-    try:
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS backups (
-                id SERIAL PRIMARY KEY,
-                filename VARCHAR(255) NOT NULL,
-                size INTEGER,
-                type VARCHAR(50) DEFAULT 'manual',
-                status VARCHAR(50) DEFAULT 'completed',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """))
-        db.commit()
-    except Exception as e:
-        print(f"Error creating backups table: {e}")
-        db.rollback()

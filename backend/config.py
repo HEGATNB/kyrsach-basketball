@@ -1,4 +1,3 @@
-# backend/config.py
 import os
 from dotenv import load_dotenv
 from pathlib import Path
@@ -22,6 +21,12 @@ class Config:
     DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = os.getenv("DB_PORT", "5432")
+
+    # Redis настройки
+    REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+    REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
     @property
     def DATABASE_URL(self) -> str:
