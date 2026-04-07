@@ -10,6 +10,8 @@ from sklearn.preprocessing import StandardScaler
 import pickle
 import os
 import sys
+import time
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -76,21 +78,118 @@ def get_db_connection():
         print(f"Ошибка подключения: {e}")
         raise
 
+    '''   
+     Сохраняет метрики модели в базу данных
+
+    Параметры:
+    - model_version: версия модели (например, "1.0.0")
+    - training_games_count: количество игр в обучающей выборке
+    - accuracy: точность на обучающей выборке
+    - loss: функция потерь на обучающей выборке
+    - validation_accuracy: точность на валидационной выборке
+    - validation_loss: функция потерь на валидационной выборке
+    - features_count: количество признаков
+    - training_duration_seconds: длительность обучения в секундах
+    - status: статус ('completed', 'failed', 'in_progress')
+    - error_message: сообщение об ошибке (если есть)
+    - metadata: дополнительные метаданные в формате JSON
+    '''
+
+def save_model_metrics_to_db(
+        model_version: str,
+        training_games_count: int,
+        accuracy: float,
+        loss: float,
+        validation_accuracy: float,
+        validation_loss: float,
+        features_count: int,
+        training_duration_seconds: float,
+        status: str = 'completed',
+        error_message: str = None,
+        metadata: dict = None
+):
+    try:
+        conn = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+        cursor = conn.cursor()
+
+        # Подготавливаем метаданные
+
+        if metadata is None:
+            metadata = {}
+
+        metadata['alpha'] = ALPHA
+        metadata['weight_decay_days'] = WEIGHT_DECAY_DAYS
+        metadata['epochs'] = 30
+        metadata['batch_size'] = 64
+
+        # Вставляем запись
+
+        cursor.execute("""
+            INSERT INTO model_metrics (
+                model_version,
+                training_date,
+                training_games_count,
+                accuracy,
+                loss,
+                validation_accuracy,
+                validation_loss,
+                features_count,
+                training_duration_seconds,
+                status,
+                error_message,
+                metadata
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            model_version,
+            datetime.now(),
+            training_games_count,
+            accuracy,
+            loss,
+            validation_accuracy,
+            validation_loss,
+            features_count,
+            training_duration_seconds,
+            status,
+            error_message,
+            json.dumps(metadata)
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"Метрики модели сохранены в БД: validation_accuracy={validation_accuracy:.4f}")
+        return True
+    except Exception as e:
+        print(f"Ошибка сохранения метрик: {e}")
+        return False
+
+
 # Парсер дат
+
 def safe_parse_date(date_val):
     if pd.isna(date_val) or date_val is None:
         return None
 
     try:
+
         # Если это уже datetime, возвращаем как есть
+
         if isinstance(date_val, datetime):
             return date_val
 
         # Если это строка
+
         if isinstance(date_val, str):
             date_val = date_val.strip()
 
             # Проверяем, что это не название колонки
+
             if date_val.lower() == 'game_date':
                 return None
 
@@ -108,7 +207,10 @@ def safe_parse_date(date_val):
         print(f"Не удалось распарсить дату '{date_val}': {e}")
         return None
 
-# Возвращает фрейм данных с играми, отсортированными по дате
+    '''   
+    Загружает данные об играх из базы данных
+    Возвращает DataFrame с играми, отсортированными по дате
+    '''
 
 def load_games():
     conn = get_db_connection()
@@ -158,7 +260,7 @@ def load_games():
 
     return df
 
-    '''    
+    '''   
     Вычисляет глобальные средние значения для всех статистических показателей
     Используется для инициализации EMA новых команд
     '''
@@ -185,7 +287,7 @@ def compute_global_averages(df):
             global_avg[stat] = 0.0
     return global_avg
 
-    '''    
+    '''   
     Предобработка данных и построение датасета для обучения
 
     Создает признаки на основе EMA (экспоненциального скользящего среднего)
@@ -286,7 +388,7 @@ def preprocess_and_build_dataset(df):
 
     return X, y, weights, team_emas, game_dates
 
-    '''  
+    '''    
     Создает нейронную сеть для бинарной классификации
 
     Архитектура:
@@ -318,75 +420,138 @@ def build_model(input_dim):
     4. Масштабирование признаков
     5. Создание и обучение нейронной сети
     6. Сохранение модели и артефактов
+    7. Сохранение метрик в базу данных
     '''
 
 def train_model(db_path=None):
+    start_time = time.time()
     print("Запуск обучения модели")
 
-    print("Загрузка данных")
-    df = load_games()
-    print(f"Всего игр: {len(df)}")
+    try:
+        print("Загрузка данных")
+        df = load_games()
+        print(f"Всего игр: {len(df)}")
 
-    if len(df) == 0:
-        print("Нет данных для обучения")
-        return None, None, None
+        if len(df) == 0:
+            print("Нет данных для обучения")
+            return None, None, None
 
-    X, y, weights, team_emas, game_dates = preprocess_and_build_dataset(df)
+        X, y, weights, team_emas, game_dates = preprocess_and_build_dataset(df)
 
-    split_idx = int(0.8 * len(X))
-    X_train, X_val = X[:split_idx], X[split_idx:]
-    y_train, y_val = y[:split_idx], y[split_idx:]
-    w_train, w_val = weights[:split_idx], weights[split_idx:]
+        split_idx = int(0.8 * len(X))
+        X_train, X_val = X[:split_idx], X[split_idx:]
+        y_train, y_val = y[:split_idx], y[split_idx:]
+        w_train, w_val = weights[:split_idx], weights[split_idx:]
 
-    print(f"Обучающая выборка: {len(X_train)} примеров")
-    print(f"Валидационная выборка: {len(X_val)} примеров")
+        print(f"Обучающая выборка: {len(X_train)} примеров")
+        print(f"Валидационная выборка: {len(X_val)} примеров")
 
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_val_scaled = scaler.transform(X_val)
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_val_scaled = scaler.transform(X_val)
 
-    model = build_model(X.shape[1])
-    model.summary()
+        model = build_model(X.shape[1])
+        model.summary()
 
-    print("Начало обучения...")
-    history = model.fit(
-        X_train_scaled, y_train,
-        sample_weight=w_train,
-        validation_data=(X_val_scaled, y_val, w_val),
-        epochs=30,
-        batch_size=64,
-        verbose=1
-    )
+        print("Начало обучения...")
+        history = model.fit(
+            X_train_scaled, y_train,
+            sample_weight=w_train,
+            validation_data=(X_val_scaled, y_val, w_val),
+            epochs=30,
+            batch_size=64,
+            verbose=1
+        )
 
-    val_loss, val_acc = model.evaluate(X_val_scaled, y_val, sample_weight=w_val)
-    print(f"Точность валидации: {val_acc:.4f}")
+        # Оценка на валидационной выборке
+        val_loss, val_acc = model.evaluate(X_val_scaled, y_val, sample_weight=w_val, verbose=0)
+        print(f"Точность валидации: {val_acc:.4f}")
 
-    model_path = os.path.join(MODEL_DIR, "model.h5")
-    scaler_path = os.path.join(MODEL_DIR, "scaler.pkl")
-    emas_path = os.path.join(MODEL_DIR, "team_emas.pkl")
+        # Оценка на обучающей выборке
+        train_loss, train_acc = model.evaluate(X_train_scaled, y_train, sample_weight=w_train, verbose=0)
+        print(f"Точность обучения: {train_acc:.4f}")
 
-    model.save(model_path)
-    with open(scaler_path, "wb") as f:
-        pickle.dump(scaler, f)
-    with open(emas_path, "wb") as f:
-        pickle.dump(team_emas, f)
+        # Сохраняем модель и артефакты
+        model_path = os.path.join(MODEL_DIR, "model.h5")
+        scaler_path = os.path.join(MODEL_DIR, "scaler.pkl")
+        emas_path = os.path.join(MODEL_DIR, "team_emas.pkl")
 
-    conn = get_db_connection()
-    teams_df = pd.read_sql_query("""
-        SELECT DISTINCT 
-            team_id_home as team_id, 
-            team_name_home as team_name, 
-            team_abbreviation_home as team_abbrev 
-        FROM game 
-        WHERE team_id_home IS NOT NULL
-    """, conn)
-    conn.close()
+        model.save(model_path)
+        with open(scaler_path, "wb") as f:
+            pickle.dump(scaler, f)
+        with open(emas_path, "wb") as f:
+            pickle.dump(team_emas, f)
 
-    teams_path = os.path.join(MODEL_DIR, "teams.csv")
-    teams_df.to_csv(teams_path, index=False)
+        # Сохраняем информацию о командах
+        conn = get_db_connection()
+        teams_df = pd.read_sql_query("""
+            SELECT DISTINCT 
+                team_id_home as team_id, 
+                team_name_home as team_name, 
+                team_abbreviation_home as team_abbrev 
+            FROM game 
+            WHERE team_id_home IS NOT NULL
+        """, conn)
+        conn.close()
 
-    print(f"Модель и артефакты сохранены в {MODEL_DIR}")
-    return model, scaler, team_emas
+        teams_path = os.path.join(MODEL_DIR, "teams.csv")
+        teams_df.to_csv(teams_path, index=False)
+
+        # Вычисляем длительность обучения
+
+        training_duration = time.time() - start_time
+        print(f"Длительность обучения: {training_duration:.2f} секунд")
+
+        # Сохраняем метрики в базу данных
+
+        save_model_metrics_to_db(
+            model_version="1.0.0",
+            training_games_count=len(X_train),
+            accuracy=float(train_acc),
+            loss=float(train_loss),
+            validation_accuracy=float(val_acc),
+            validation_loss=float(val_loss),
+            features_count=X.shape[1],
+            training_duration_seconds=training_duration,
+            status="completed",
+            metadata={
+                "total_games": len(df),
+                "validation_games": len(X_val),
+                "alpha": ALPHA,
+                "weight_decay_days": WEIGHT_DECAY_DAYS,
+                "epochs_completed": len(history.history['loss']),
+                "final_train_loss": float(history.history['loss'][-1]),
+                "final_val_loss": float(history.history['val_loss'][-1])
+            }
+        )
+
+        print(f"Модель и артефакты сохранены в {MODEL_DIR}")
+        return model, scaler, team_emas
+
+    except Exception as e:
+        # В случае ошибки сохраняем информацию об ошибке
+        training_duration = time.time() - start_time
+        error_msg = str(e)
+        print(f"Ошибка при обучении модели: {error_msg}")
+
+        try:
+            save_model_metrics_to_db(
+                model_version="1.0.0",
+                training_games_count=0,
+                accuracy=0.0,
+                loss=0.0,
+                validation_accuracy=0.0,
+                validation_loss=0.0,
+                features_count=0,
+                training_duration_seconds=training_duration,
+                status="failed",
+                error_message=error_msg,
+                metadata={"error_type": type(e).__name__}
+            )
+        except Exception as db_error:
+            print(f"Не удалось сохранить информацию об ошибке в БД: {db_error}")
+
+        raise
 
 
 if __name__ == "__main__":
