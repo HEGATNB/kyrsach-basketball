@@ -1,152 +1,175 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { apiRequest } from '@/shared/api/client';
-import { GlowingCard } from '@/shared/ui/GlowingCard';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Cpu, Lock, Sparkles } from 'lucide-react';
+import { apiRequest, type Team } from '@/shared/api/client';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { Cpu } from 'lucide-react';
-
-interface Team {
-  id: number;
-  name: string;
-  wins: number;
-  losses: number;
-}
+import { GlowingCard } from '@/shared/ui/GlowingCard';
+import { TeamMark } from '@/shared/ui/TeamMark';
+import { TeamSelect } from '@/shared/ui/TeamSelect';
 
 export const PredictionNewPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [teams, setTeams] = useState<Team[]>([]);
-  const [team1Id, setTeam1Id] = useState('');
-  const [team2Id, setTeam2Id] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [team1Id, setTeam1Id] = useState(searchParams.get('team1') || '');
+  const [team2Id, setTeam2Id] = useState(searchParams.get('team2') || '');
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadTeams();
+    apiRequest<Team[]>('/teams')
+      .then((data) => setTeams(data.sort((left, right) => right.wins - left.wins)))
+      .catch(() => setError('Could not load teams for prediction.'))
+      .finally(() => setLoadingTeams(false));
   }, []);
 
-  const loadTeams = async () => {
-    try {
-      const data = await apiRequest<Team[]>('/teams');
-      setTeams(data);
-    } catch (err) {
-      console.error('Ошибка загрузки команд:', err);
-    } finally {
-      setLoadingTeams(false);
-    }
-  };
+  const selectedTeams = useMemo(() => {
+    const home = teams.find((team) => String(team.id) === team1Id) || null;
+    const away = teams.find((team) => String(team.id) === team2Id) || null;
+    return { home, away };
+  }, [team1Id, team2Id, teams]);
 
   const handlePredict = async () => {
     if (!team1Id || !team2Id) {
-      alert('Выберите обе команды');
-      return;
-    }
-    if (team1Id === team2Id) {
-      alert('Команды должны быть разными');
+      setError('Pick both teams before starting the model.');
       return;
     }
 
-    setLoading(true);
+    if (team1Id === team2Id) {
+      setError('Choose two different teams.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
     try {
-      console.log('📤 Отправляем запрос на /predict');
-      
-      const result = await apiRequest<any>('/predict', {
-        method: 'POST',
-        body: JSON.stringify({
-          team1Id: Number(team1Id),
-          team2Id: Number(team2Id)
-        })
-      });
-      
-      console.log('✅ Получен ответ от сервера:', result);
-      console.log('📌 ID прогноза:', result.id);
-      
-      if (!result.id) {
-        throw new Error('Сервер не вернул ID прогноза');
-      }
-      
-      // Принудительный переход с таймаутом
-      setTimeout(() => {
-        navigate(`/prediction/${result.id}`);
-      }, 100);
-      
-    } catch (err: any) {
-      console.error('❌ Ошибка:', err);
-      alert(err.message || 'Ошибка при создании прогноза');
+      const result = await apiRequest<{ id: string }>(
+        '/predict',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            team1Id: Number(team1Id),
+            team2Id: Number(team2Id),
+          }),
+        },
+        false,
+      );
+
+      navigate(`/prediction/${result.id}`);
+    } catch (predictionError: any) {
+      setError(predictionError.message || 'Prediction failed.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  if (!user) {
+    return (
+      <GlowingCard glowColor="purple" className="mx-auto max-w-3xl p-8 text-center">
+        <Lock className="mx-auto h-10 w-10 text-[#ead9d1]" />
+        <h1 className="mt-5 text-3xl font-semibold text-white">Sign in to run private predictions.</h1>
+        <p className="mt-3 text-slate-300">
+          Predictions are stored against real user accounts, so you need an authenticated session before the model can
+          save and return a result.
+        </p>
+        <Link to="/auth" className="btn-primary mt-6">
+          Unlock prediction mode
+        </Link>
+      </GlowingCard>
+    );
+  }
+
   if (loadingTeams) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <GlowingCard glowColor="orange" intensity="high" className="p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Cpu className="w-8 h-8 text-orange-400" />
-            <h1 className="text-3xl font-bold text-white">AI Прогноз</h1>
+    <div className="space-y-8">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+        <GlowingCard glowColor="orange" className="p-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="data-chip">
+              <Cpu className="h-3.5 w-3.5" />
+              Matchup engine
+            </span>
+            <span className="data-chip">{teams.length} teams available</span>
           </div>
+          <h1 className="mt-5 max-w-3xl font-spacegrotesk text-4xl font-bold text-white sm:text-5xl">
+            Build a matchup and let the model work from real team context.
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
+            Historical rows, recent form, roster quality and matchup context now flow together through the live
+            prediction engine.
+          </p>
+        </GlowingCard>
 
-          <div className="space-y-6">
-            <select
-              value={team1Id}
-              onChange={(e) => setTeam1Id(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
-              disabled={loading}
-            >
-              <option value="">Команда 1 (хозяева)</option>
-              {teams.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.wins}-{t.losses})
-                </option>
-              ))}
-            </select>
-
-            <div className="text-center text-2xl font-bold text-slate-600">VS</div>
-
-            <select
-              value={team2Id}
-              onChange={(e) => setTeam2Id(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
-              disabled={loading}
-            >
-              <option value="">Команда 2 (гости)</option>
-              {teams.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.wins}-{t.losses})
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={handlePredict}
-              disabled={loading}
-              className="w-full py-4 bg-orange-500 text-white rounded-xl font-bold text-lg hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>AI анализирует...</span>
-                </>
-              ) : (
-                'Сделать прогноз'
-              )}
-            </button>
+        <GlowingCard glowColor="blue" className="p-6">
+          <p className="text-xs uppercase tracking-[0.28em] text-[rgba(214,225,235,0.72)]">Preview</p>
+          <div className="mt-5 space-y-3">
+            {[selectedTeams.home, selectedTeams.away].map((team, index) => (
+              <div key={index} className="surface-muted flex items-center gap-4">
+                <TeamMark team={team} size="md" className="h-16 w-16 rounded-[18px]" />
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{index === 0 ? 'Home side' : 'Away side'}</p>
+                  <p className="mt-1 truncate text-lg font-semibold text-white">{team?.name || 'Select a team'}</p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {team ? `${team.wins}-${team.losses} / ${team.avgPointsFor.toFixed(1)} PPG` : 'Waiting for selection'}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </GlowingCard>
-      </motion.div>
+      </section>
+
+      <GlowingCard glowColor="green" className="overflow-visible p-8">
+        <div className="grid gap-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div className="space-y-3">
+            <label className="text-xs uppercase tracking-[0.26em] text-[rgba(236,216,171,0.72)]">Home team</label>
+            <TeamSelect
+              value={team1Id}
+              onChange={setTeam1Id}
+              teams={teams}
+              placeholder="Choose the home side"
+              searchPlaceholder="Search the home team..."
+            />
+          </div>
+
+          <div className="flex items-center justify-center">
+            <div className="status-pill bg-white/5 text-slate-300">VS</div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-xs uppercase tracking-[0.26em] text-[rgba(214,225,235,0.72)]">Away team</label>
+            <TeamSelect
+              value={team2Id}
+              onChange={setTeam2Id}
+              teams={teams}
+              placeholder="Choose the away side"
+              searchPlaceholder="Search the away team..."
+            />
+          </div>
+        </div>
+
+        {error && <p className="mt-5 rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</p>}
+
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+          <div className="text-sm text-slate-300">
+            <p>Prediction is saved to your account and scored by the hybrid model immediately.</p>
+          </div>
+          <button type="button" onClick={handlePredict} disabled={submitting} className="btn-primary disabled:cursor-not-allowed disabled:opacity-70">
+            <Sparkles className="h-4 w-4" />
+            {submitting ? 'Running model...' : 'Generate prediction'}
+          </button>
+        </div>
+      </GlowingCard>
     </div>
   );
 };

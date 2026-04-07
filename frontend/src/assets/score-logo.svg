@@ -1,0 +1,66 @@
+<svg width="920" height="300" viewBox="0 0 920 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="score-word-fill" x1="110" y1="38" x2="812" y2="238" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFB24B"/>
+      <stop offset="0.55" stop-color="#FF8A1E"/>
+      <stop offset="1" stop-color="#F46A13"/>
+    </linearGradient>
+    <linearGradient id="score-badge-fill" x1="400" y1="32" x2="400" y2="242" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFB24B"/>
+      <stop offset="1" stop-color="#F57B1F"/>
+    </linearGradient>
+    <radialGradient id="score-ball-fill" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(438 108) rotate(118.4) scale(97.4)">
+      <stop offset="0" stop-color="#FFD078"/>
+      <stop offset="0.42" stop-color="#FFA02F"/>
+      <stop offset="1" stop-color="#F36E16"/>
+    </radialGradient>
+    <filter id="score-shadow" x="0" y="0" width="920" height="300" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000000" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#score-shadow)">
+    <text
+      x="36"
+      y="212"
+      fill="url(#score-word-fill)"
+      font-family="Impact, Haettenschweiler, 'Arial Black', sans-serif"
+      font-size="170"
+      font-weight="900"
+      letter-spacing="4"
+      stroke="#2D2D2D"
+      stroke-width="10"
+      paint-order="stroke"
+    >
+      SC
+    </text>
+
+    <text
+      x="498"
+      y="212"
+      fill="url(#score-word-fill)"
+      font-family="Impact, Haettenschweiler, 'Arial Black', sans-serif"
+      font-size="170"
+      font-weight="900"
+      letter-spacing="4"
+      stroke="#2D2D2D"
+      stroke-width="10"
+      paint-order="stroke"
+    >
+      RE
+    </text>
+
+    <circle cx="438" cy="140" r="74" fill="url(#score-ball-fill)" stroke="#D45C0F" stroke-width="4"/>
+    <path d="M439 66C419 86 410 112 410 140C410 168 419 194 439 214" stroke="#2D2D2D" stroke-width="5" stroke-linecap="round"/>
+    <path d="M438 66C458 86 467 112 467 140C467 168 458 194 438 214" stroke="#2D2D2D" stroke-width="5" stroke-linecap="round"/>
+    <path d="M364 140H512" stroke="#2D2D2D" stroke-width="5" stroke-linecap="round"/>
+    <path d="M390 93C422 107 454 107 486 93" stroke="#2D2D2D" stroke-width="5" stroke-linecap="round"/>
+    <path d="M390 187C422 173 454 173 486 187" stroke="#2D2D2D" stroke-width="5" stroke-linecap="round"/>
+
+    <rect x="315" y="32" width="170" height="216" rx="18" fill="url(#score-badge-fill)" stroke="#2D2D2D" stroke-width="10"/>
+    <rect x="332" y="49" width="136" height="182" rx="12" fill="#FFB24B" fill-opacity="0.12" stroke="#2D2D2D" stroke-opacity="0.22" stroke-width="3"/>
+    <path d="M421 74C388 96 374 125 374 140C374 155 388 184 421 206V74Z" fill="#FF7C1A" stroke="#2D2D2D" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M423 75C403 101 395 123 395 140C395 157 403 179 423 205" stroke="#2D2D2D" stroke-width="5" stroke-linecap="round"/>
+    <path d="M423 75C445 101 451 123 451 140C451 157 445 179 423 205" stroke="#2D2D2D" stroke-width="5" stroke-linecap="round" opacity="0.86"/>
+  </g>
+</svg>
