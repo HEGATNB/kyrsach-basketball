@@ -14,14 +14,13 @@ import schemas
 
 router = APIRouter()
 
-
+# Блокировка/Разблокировка пользователя
 @router.put("/users/{user_id}/block")
 async def toggle_user_block(
         user_id: int,
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Блокировка/разблокировка пользователя с отзывом всех токенов"""
     await require_admin(request)
 
     try:
@@ -92,13 +91,12 @@ async def toggle_user_block(
         )
 
 
-# Остальные методы admin.py без изменений
+# Получение статистики админ панели
 @router.get("/stats")
 async def get_admin_stats(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение статистики для админ-панели"""
     await require_admin(request)
 
     try:
@@ -165,7 +163,6 @@ async def get_all_users(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение списка всех пользователей"""
     await require_admin(request)
 
     try:
@@ -197,13 +194,13 @@ async def get_all_users(
         )
 
 
+# Получение логов аудита
 @router.get("/logs", response_model=List[schemas.AuditLogResponse])
 async def get_audit_logs(
         request: Request,
         limit: int = 100,
         db: Session = Depends(get_db)
 ):
-    """Получение логов аудита"""
     await require_admin(request)
 
     try:
@@ -224,7 +221,6 @@ async def create_backup(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Создание бэкапа"""
     await require_admin(request)
 
     try:
@@ -324,13 +320,13 @@ async def create_backup(
             detail=f"Error creating backup: {str(e)}"
         )
 
+# Получение списка бэкапов
 
 @router.get("/backups", response_model=List[schemas.BackupResponse])
 async def get_backups(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Получение списка бэкапов"""
     await require_admin(request)
 
     try:
@@ -361,6 +357,7 @@ async def get_backups(
             detail=f"Error getting backups: {str(e)}"
         )
 
+# Восстановление из бэкапа
 
 @router.post("/restore/{backup_id}")
 async def restore_backup(
@@ -368,7 +365,6 @@ async def restore_backup(
         request: Request,
         db: Session = Depends(get_db)
 ):
-    """Восстановление из бэкапа"""
     await require_admin(request)
 
     try:
@@ -380,7 +376,7 @@ async def restore_backup(
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Backup not found"
+                detail="Бэкап не найден"
             )
 
         import json
@@ -392,7 +388,7 @@ async def restore_backup(
         if not os.path.exists(filepath):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Backup file not found"
+                detail="Файл бэкапа не найден"
             )
 
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -448,7 +444,7 @@ async def restore_backup(
             ip_address=request.client.host if request.client else None
         )
 
-        return {"message": "Backup restored successfully"}
+        return {"message": "Бэкап успешно восстановлен"}
 
     except HTTPException:
         raise

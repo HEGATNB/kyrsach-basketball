@@ -19,66 +19,61 @@ async def predict(
         db: Session = Depends(get_db)
 ):
     try:
-        print("=" * 60)
-        print("🔮 НАЧАЛО ПРЕДСКАЗАНИЯ")
-        print(f"📥 Получены данные: team1_id={prediction_data.team1_id}, team2_id={prediction_data.team2_id}")
+        print(f" Получены данные: team1_id={prediction_data.team1_id}, team2_id={prediction_data.team2_id}")
 
         # Проверка авторизации
         user_data = await get_current_user(request)
         if not user_data:
-            print("❌ Пользователь не авторизован")
+            print("Пользователь не авторизован")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Не авторизован"
             )
-        print(f"✅ Пользователь авторизован: ID={user_data.user_id}, Role={user_data.role}")
+        print(f" Пользователь авторизован: ID={user_data.user_id}, Role={user_data.role}")
 
         ai_svc = AIService(db)
         team_svc = TeamService(db)
         audit_svc = AuditService(db)
 
         # Проверка существования команд
-        print(f"🔍 Поиск команды 1: {prediction_data.team1_id}")
+        print(f" Поиск команды 1: {prediction_data.team1_id}")
         team1 = team_svc.get_team_by_id(prediction_data.team1_id)
         print(f"   Результат: {team1}")
 
-        print(f"🔍 Поиск команды 2: {prediction_data.team2_id}")
+        print(f" Поиск команды 2: {prediction_data.team2_id}")
         team2 = team_svc.get_team_by_id(prediction_data.team2_id)
         print(f"   Результат: {team2}")
 
         if not team1 or not team2:
-            print(f"❌ Команды не найдены: team1={team1 is not None}, team2={team2 is not None}")
+            print(f"Команды не найдены: team1={team1 is not None}, team2={team2 is not None}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Одна из команд не найдена: {prediction_data.team1_id} или {prediction_data.team2_id}"
             )
 
         if prediction_data.team1_id == prediction_data.team2_id:
-            print("❌ Команды одинаковые")
+            print("Команды одинаковые")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Команды должны быть разными"
             )
-
-        # Получение предсказания
-        print("🤖 Вызов AI предсказания...")
         try:
             prediction = await ai_svc.predict_match(
                 prediction_data.team1_id,
                 prediction_data.team2_id,
                 user_data.user_id
             )
-            print(f"✅ Предсказание получено: ID={prediction['id']}")
-            print(f"   Вероятности: {prediction['probabilityTeam1']}% / {prediction['probabilityTeam2']}%")
+            print(f"Предсказание получено: ID={prediction['id']}")
+            print(f"Вероятности: {prediction['probabilityTeam1']}% / {prediction['probabilityTeam2']}%")
         except Exception as e:
-            print(f"❌ AI prediction error: {e}")
+            print(f"AI prediction error: {e}")
             import traceback
             traceback.print_exc()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Ошибка при создании прогноза: {str(e)}"
             )
-        print("📝 Логирование действия...")
+        # Логирование
         audit_svc.log(
             user_id=user_data.user_id,
             action="PREDICT",
@@ -93,14 +88,13 @@ async def predict(
             ip_address=request.client.host if request.client else None
         )
 
-        print("✅ ПРЕДСКАЗАНИЕ УСПЕШНО ЗАВЕРШЕНО")
-        print("=" * 60)
+        print(" Предсказание успешно")
         return prediction
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Необработанная ошибка в predict: {e}")
+        print(f"Необработанная ошибка в predict: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(
@@ -162,6 +156,8 @@ async def get_my_predictions(
     )
     return predictions
 
+
+# Получение предсказание по id (существующего)
 
 @router.get("/predictions/{prediction_id}", response_model=schemas.PredictionResponse)
 async def get_prediction_by_id(

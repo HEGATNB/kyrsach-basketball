@@ -26,9 +26,9 @@ class RedisService:
                 socket_timeout=5
             )
             self.client.ping()
-            logger.info(f"✅ Redis connected successfully on {config.REDIS_HOST}:{config.REDIS_PORT}")
+            logger.info(f" Redis успешно подключен на {config.REDIS_HOST}:{config.REDIS_PORT}")
         except Exception as e:
-            logger.warning(f"⚠️ Redis connection failed: {e}. Running without Redis.")
+            logger.warning(f"️ Ошибка подключения Redis {e}. Запуск без Redis.")
             self.client = None
 
     def is_available(self) -> bool:

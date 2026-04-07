@@ -10,7 +10,7 @@ import schemas
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-
+# Роуты для получения игроков
 @router.get("", response_model=List[schemas.PlayerResponse])
 @router.get("/", response_model=List[schemas.PlayerResponse])
 async def get_all_players(
@@ -51,7 +51,7 @@ async def get_all_players(
             detail=f"Error getting players: {str(e)}"
         )
 
-
+# Роут для получения сезонов
 @router.get("/seasons", response_model=List[str])
 async def get_seasons(db: Session = Depends(get_db)):
     try:
@@ -64,7 +64,7 @@ async def get_seasons(db: Session = Depends(get_db)):
             detail="Error getting seasons"
         )
 
-
+# Роут для получения лучших игроков
 @router.get("/top/{category}", response_model=List[Dict[str, Any]])
 async def get_top_players(
     category: str,
@@ -90,7 +90,7 @@ async def get_top_players(
             detail=f"Error getting top players: {str(e)}"
         )
 
-
+# Получение игрока по id
 @router.get("/{player_id}", response_model=schemas.PlayerResponse)
 async def get_player_by_id(
     player_id: int,
@@ -120,7 +120,7 @@ async def get_player_by_id(
             detail=f"Error getting player: {str(e)}"
         )
 
-
+# Получение команды по сокращению (аббривеатуре)
 @router.get("/team/{team_abbrev}", response_model=List[schemas.PlayerResponse])
 async def get_players_by_team(
     team_abbrev: str,

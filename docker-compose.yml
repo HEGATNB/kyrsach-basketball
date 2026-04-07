@@ -1,4 +1,16 @@
 ﻿services:
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app_network
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     ports:
@@ -51,9 +63,6 @@
       - ENVIRONMENT=development
       - MODEL_DIR=/app/models
       - DB_PATH=/app/nba.sqlite
-      - HTTP_PROXY=
-      - HTTPS_PROXY=
-      - NO_PROXY=localhost,127.0.0.1,db,redis
     depends_on:
       db:
         condition: service_healthy
@@ -72,23 +81,6 @@
       - 8.8.4.4
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000
-      - VITE_PROXY_TARGET=http://backend:8000
-    depends_on:
-      - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/dist
-    restart: unless-stopped
-    networks:
-      - app_network
 
 networks:
   app_network:
