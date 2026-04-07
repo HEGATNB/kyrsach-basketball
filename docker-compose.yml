@@ -1,0 +1,63 @@
+﻿version: '3.8'
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nba
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_NAME=nba
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - JWT_SECRET=hzIoUfN8qA5t535Rpv_jvyzul5aRLwxLPJIxcINBCx4
+      - JWT_EXPIRES_IN=7d
+      - ENVIRONMENT=development
+      - MODEL_DIR=/app/models
+      - DB_PATH=/app/nba.sqlite
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+      - /app/.venv
+      - backend_models:/app/models
+      - backend_backups:/app/backups
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_PROXY_TARGET=http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/dist
+
+volumes:
+  postgres_data:
+  backend_models:
+  backend_backups:

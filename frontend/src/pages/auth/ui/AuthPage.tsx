@@ -45,7 +45,7 @@ const ACCESS_FEATURES = [
   },
 ];
 
-export function AuthPage() {
+export default function AuthPage() {
   const navigate = useNavigate();
   const { login, register } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
@@ -277,5 +277,3 @@ export function AuthPage() {
     </div>
   );
 }
-
-export default AuthPage;
