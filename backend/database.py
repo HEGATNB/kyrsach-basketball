@@ -6,7 +6,7 @@ from config import config
 
 SQLALCHEMY_DATABASE_URL = config.DATABASE_URL
 
-print(f"🔌 Подключение к БД: {config.DB_USER}@ {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}")
+print(f"Подключение к БД: {config.DB_USER}@ {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

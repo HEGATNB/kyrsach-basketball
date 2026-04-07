@@ -8,9 +8,9 @@ BASE_DIR = Path(__file__).resolve().parent
 env_path = BASE_DIR / 'env'
 if env_path.exists():
     load_dotenv(env_path)
-    print(f"✅ Загружен env файл: {env_path}")
+    print(f" Загружен env файл: {env_path}")
 else:
-    print(f"⚠️ env файл не найден: {env_path}")
+    print(f" env файл не найден: {env_path}")
     load_dotenv()
 
 
