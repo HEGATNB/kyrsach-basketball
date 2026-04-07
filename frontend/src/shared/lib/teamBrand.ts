@@ -10,8 +10,8 @@ export interface TeamBrand {
 const FALLBACK_BRAND: TeamBrand = {
   name: 'NBA',
   teamId: 'league',
-  brandColor: '#c96a2b',
-  accentColor: '#607d96',
+  brandColor: '#e41c38',
+  accentColor: '#1d428a',
   neutralColor: '#f5efe4',
   logoUrl: 'https://www.basketball-reference.com/req/202503171/images/league/NBA_logo.png',
 };

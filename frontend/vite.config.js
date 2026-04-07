@@ -11,12 +11,6 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: '0.0.0.0',
-    proxy: {
-      '/api': {
-        target: process.env.VITE_PROXY_TARGET || 'http://backend:8000',
-        changeOrigin: true,
-      },
-    },
-  },
+    open: true
+  }
 })

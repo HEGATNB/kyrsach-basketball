@@ -51,7 +51,7 @@ export const TeamPage = () => {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
@@ -69,7 +69,7 @@ export const TeamPage = () => {
   }
 
   const differential = team.avgPointsFor - team.avgPointsAgainst;
-  const tint = hexToRgba(team.brandColor || '#c96a2b', 0.16);
+  const tint = hexToRgba(team.brandColor || '#e41c38', 0.16);
 
   return (
     <div className="space-y-8">
@@ -169,7 +169,7 @@ export const TeamPage = () => {
 
       <section className="space-y-5">
         <div className="flex items-center gap-3">
-          <Users className="h-6 w-6 text-[#ecd8ab]" />
+          <Users className="h-6 w-6 text-[var(--accent)]" />
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Roster</p>
             <h2 className="text-2xl font-semibold text-white">Core rotation</h2>

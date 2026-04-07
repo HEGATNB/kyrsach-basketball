@@ -188,7 +188,7 @@ export const AdminPage = () => {
   if (authLoading || !user) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
@@ -288,7 +288,7 @@ export const AdminPage = () => {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <div className="h-14 w-14 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
+          <div className="h-14 w-14 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
         </div>
       ) : (
         <>
@@ -314,9 +314,9 @@ export const AdminPage = () => {
                       ['Players tracked', stats?.totalPlayers ?? 0],
                       ['Predictions tracked', stats?.totalPredictions ?? 0],
                     ].map(([label, value]) => (
-                      <div key={label} className="table-row flex items-center justify-between px-5 py-4">
-                        <span className="text-sm text-slate-400">{label}</span>
-                        <span className="text-lg font-semibold text-white">{value}</span>
+                      <div key={label} className="table-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-8 px-5 py-4">
+                        <span className="min-w-0 text-sm text-slate-400">{label}</span>
+                        <span className="text-right text-lg font-semibold tabular-nums text-white">{value}</span>
                       </div>
                     ))}
                   </div>

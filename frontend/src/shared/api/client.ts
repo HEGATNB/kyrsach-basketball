@@ -13,10 +13,13 @@ export interface Team {
   id: number;
   name: string;
   city?: string;
+  state?: string;
+  nickname?: string;
   abbrev?: string;
   arena?: string;
   wins: number;
   losses: number;
+  winPct?: number;
   avgPointsFor: number;
   avgPointsAgainst: number;
   championships?: number;
@@ -77,37 +80,29 @@ export interface Player {
   team_abbrev?: string;
 }
 
-export interface Player {
-  id: number;
-  first_name: string;
-  last_name: string;
-  number?: string;
-  position?: string;
-  height?: string;
-  weight?: number;  // ДОЛЖНО БЫТЬ number, НЕ string!
-  minutes_per_game?: number;
-  points_per_game: number;
-  rebounds_per_game: number;
-  assists_per_game: number;
-  steals_per_game?: number;
-  blocks_per_game?: number;
-  image_url?: string;
-  team?: Team;
-  games_played?: number;
-  season?: string;
-  college?: string;
-  country?: string;
-  draft_year?: string;
-  draft_round?: string;
-  draft_number?: string;
-  usage_rate?: number;
-  true_shooting?: number;
-  net_rating?: number;
-  assist_percentage?: number;
-  offensive_rebound_pct?: number;
-  defensive_rebound_pct?: number;
-  age?: number;
-  team_abbrev?: string;
+export interface Prediction {
+  id: string | number;
+  team1Id: number;
+  team2Id: number;
+  team1?: Team;
+  team2?: Team;
+  probabilityTeam1: number;
+  probabilityTeam2: number;
+  expectedScoreTeam1: number;
+  expectedScoreTeam2: number;
+  confidence: number;
+  createdAt: string;
+  probabilities?: {
+    team1: number;
+    team2: number;
+  };
+  expectedScore?: {
+    team1: number;
+    team2: number;
+  };
+  modelVersion?: string;
+  trainingDataPoints?: number;
+  factors?: any;
 }
 
 export interface AdminUser extends AuthUser {
@@ -165,25 +160,29 @@ function normalizeUser(raw: any): AuthUser {
 }
 
 function normalizeTeam(raw: any): Team {
+  const fullName = raw?.full_name || raw?.fullName || raw?.name;
   const brand = getTeamBrand({
     abbrev: raw?.abbrev,
-    name: raw?.fullName || raw?.name,
+    name: fullName,
   });
 
   return {
     id: Number(raw?.id || 0),
-    name: raw?.fullName || raw?.name || 'Unknown team',
+    name: fullName || 'Unknown team',
     city: raw?.city || undefined,
+    state: raw?.state || undefined,
+    nickname: raw?.nickname || undefined,
     abbrev: raw?.abbrev || undefined,
     arena: raw?.arena || undefined,
     wins: Number(raw?.wins ?? raw?.seasonWins ?? 0),
     losses: Number(raw?.losses ?? raw?.seasonLosses ?? 0),
-    avgPointsFor: Number(raw?.pointsFor ?? raw?.pointsPerGame ?? 0),
-    avgPointsAgainst: Number(raw?.pointsAgainst ?? 0),
+    winPct: raw?.winPct !== undefined ? Number(raw.winPct) : raw?.win_pct !== undefined ? Number(raw.win_pct) : undefined,
+    avgPointsFor: Number(raw?.pointsFor ?? raw?.pointsPerGame ?? raw?.points_per_game ?? 0),
+    avgPointsAgainst: Number(raw?.pointsAgainst ?? raw?.points_against ?? 0),
     championships: Number(raw?.championships ?? 0),
-    foundedYear: raw?.foundedYear ?? undefined,
-    pointsPerGame: Number(raw?.pointsPerGame ?? raw?.pointsFor ?? 0),
-    pointsAgainst: Number(raw?.pointsAgainst ?? 0),
+    foundedYear: raw?.foundedYear ?? raw?.founded_year ?? undefined,
+    pointsPerGame: Number(raw?.pointsPerGame ?? raw?.pointsFor ?? raw?.points_per_game ?? 0),
+    pointsAgainst: Number(raw?.pointsAgainst ?? raw?.points_against ?? 0),
     logoUrl: raw?.logoUrl || brand.logoUrl,
     brandColor: raw?.brandColor || brand.brandColor,
     accentColor: raw?.accentColor || brand.accentColor,
@@ -191,6 +190,19 @@ function normalizeTeam(raw: any): Team {
       ? { name: raw.conference.name, shortName: raw.conference.shortName }
       : undefined,
     division: raw?.division ? { name: raw.division.name } : undefined,
+  };
+}
+
+function normalizePredictStats(raw: any) {
+  return {
+    ...raw,
+    accuracy: raw?.accuracy === null || raw?.accuracy === undefined ? null : Number(raw.accuracy),
+    totalPredictions: Number(raw?.totalPredictions ?? 0),
+    totalUsers: Number(raw?.totalUsers ?? 0),
+    totalTrainingData: Number(raw?.totalTrainingData ?? raw?.totalTrainingGames ?? 0),
+    totalTrainingGames: Number(raw?.totalTrainingGames ?? raw?.totalTrainingData ?? 0),
+    modelVersion: raw?.modelVersion || 'v1.0',
+    lastUpdated: raw?.lastUpdated || undefined,
   };
 }
 
@@ -226,15 +238,23 @@ function normalizeMatch(raw: any): Match {
 }
 
 function normalizePlayer(raw: any): Player {
+  const teamAbbrev = raw?.team_abbrev || raw?.team?.abbrev || undefined;
+  const teamName = raw?.team_name || raw?.team?.full_name || raw?.team?.name || teamAbbrev;
+  const teamCity = raw?.team_city || raw?.team?.city || undefined;
+  const brand = getTeamBrand({
+    abbrev: teamAbbrev,
+    name: teamName,
+  });
+
   return {
     id: Number(raw?.id || 0),
     first_name: raw?.first_name || raw?.firstName || '',
     last_name: raw?.last_name || raw?.lastName || '',
-    number: raw?.number ? Number(raw.number) : undefined,
+    number: raw?.number ? String(raw.number) : undefined,
     position: raw?.position || undefined,
-    team_id: 0,
-    height: raw?.height ? raw.height : undefined,
-    weight: raw?.weight ? Number(raw.weight) : undefined,
+    team_id: Number(raw?.team_id ?? raw?.team?.id ?? 0),
+    height: raw?.height || raw?.player_height || undefined,
+    weight: raw?.weight ? Number(raw.weight) : raw?.player_weight ? Number(raw.player_weight) : undefined,
     birth_date: raw?.birth_date || undefined,
     points_per_game: Number(raw?.points_per_game || 0),
     rebounds_per_game: Number(raw?.rebounds_per_game || 0),
@@ -253,14 +273,25 @@ function normalizePlayer(raw: any): Player {
     usage_rate: raw?.usage_rate,
     true_shooting: raw?.true_shooting,
     net_rating: raw?.net_rating,
+    assist_percentage: raw?.assist_percentage,
+    offensive_rebound_pct: raw?.offensive_rebound_pct,
+    defensive_rebound_pct: raw?.defensive_rebound_pct,
+    player_height: raw?.player_height,
+    player_weight: raw?.player_weight ? Number(raw.player_weight) : undefined,
+    age: raw?.age ? Number(raw.age) : undefined,
+    team_abbrev: teamAbbrev,
     team: raw?.team_abbrev ? {
-      id: 0,
-      name: raw.team_abbrev,
-      abbrev: raw.team_abbrev,
+      id: Number(raw?.team_id ?? raw?.team?.id ?? 0),
+      name: teamName || brand.name,
+      city: teamCity,
+      abbrev: teamAbbrev,
       wins: 0,
       losses: 0,
       avgPointsFor: 0,
-      avgPointsAgainst: 0
+      avgPointsAgainst: 0,
+      logoUrl: raw?.team?.logoUrl || brand.logoUrl,
+      brandColor: raw?.team?.brandColor || brand.brandColor,
+      accentColor: raw?.team?.accentColor || brand.accentColor,
     } : undefined
   };
 }
@@ -347,7 +378,11 @@ function normalizeByEndpoint(endpoint: string, payload: any): any {
     return Array.isArray(payload) ? payload.map(normalizeTeam) : normalizeTeam(payload);
   }
 
-  if (endpoint.startsWith('/predict/stats') || endpoint.startsWith('/predict/evaluate')) {
+  if (endpoint.startsWith('/predict/stats')) {
+    return normalizePredictStats(payload);
+  }
+
+  if (endpoint.startsWith('/predict/evaluate')) {
     return payload;
   }
 

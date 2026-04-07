@@ -46,7 +46,7 @@ export const MatchesPage = () => {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
@@ -162,7 +162,7 @@ export const MatchesPage = () => {
                     <td className="relative px-5 py-4 align-middle">
                       <span
                         className="absolute bottom-4 left-0 top-4 w-[2px] rounded-full"
-                        style={{ backgroundColor: hexToRgba(match.homeTeam.brandColor || '#c96a2b', 0.45) }}
+                        style={{ backgroundColor: hexToRgba(match.homeTeam.brandColor || '#e41c38', 0.45) }}
                       />
                       <p className="text-sm font-semibold text-white">{formatGameDay(match.date)}</p>
                       <p className="mt-1 text-sm text-slate-400">{formatGameTime(match.date)}</p>
@@ -219,7 +219,7 @@ export const MatchesPage = () => {
                 key={match.id}
                 to={`/matches/${match.id}`}
                 className="table-row block border-l-2 border-l-transparent px-5 py-4"
-                style={{ borderLeftColor: hexToRgba(match.homeTeam.brandColor || '#c96a2b', 0.45) }}
+                style={{ borderLeftColor: hexToRgba(match.homeTeam.brandColor || '#e41c38', 0.45) }}
               >
                 <div>
                   <p className="text-sm font-semibold text-white">{formatGameDay(match.date)}</p>

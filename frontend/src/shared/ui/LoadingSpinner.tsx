@@ -19,16 +19,16 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   const spinner = (
     <div className="flex items-center justify-center">
       <motion.div
-        className={`${sizes[size]} border-4 border-orange-500 border-t-transparent rounded-full`}
+        className={`${sizes[size]} rounded-full border-4 border-[rgba(232,161,67,0.22)] border-t-[var(--accent)]`}
         animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
       />
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(9,6,4,0.66)] backdrop-blur-sm">
         {spinner}
       </div>
     );

@@ -34,7 +34,7 @@ export const PredictionResultPage = () => {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
@@ -116,8 +116,8 @@ export const PredictionResultPage = () => {
               className="h-full"
               style={{
                 width: `${prediction.probabilityTeam1}%`,
-                background: `linear-gradient(90deg, ${prediction.team1?.brandColor || '#c96a2b'}, ${hexToRgba(
-                  prediction.team1?.accentColor || '#d8b46a',
+                background: `linear-gradient(90deg, ${prediction.team1?.brandColor || '#e41c38'}, ${hexToRgba(
+                  prediction.team1?.accentColor || '#ff4d29',
                   0.9,
                 )})`,
               }}
@@ -126,7 +126,7 @@ export const PredictionResultPage = () => {
               className="h-full"
               style={{
                 width: `${prediction.probabilityTeam2}%`,
-                background: `linear-gradient(90deg, ${prediction.team2?.brandColor || '#607d96'}, ${hexToRgba(
+                background: `linear-gradient(90deg, ${prediction.team2?.brandColor || '#1d428a'}, ${hexToRgba(
                   prediction.team2?.accentColor || '#d6e1eb',
                   0.9,
                 )})`,

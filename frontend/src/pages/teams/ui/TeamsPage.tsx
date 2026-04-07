@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { apiRequest, type Team } from '@/shared/api/client';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
 import { TeamMark } from '@/shared/ui/TeamMark';
@@ -82,7 +82,7 @@ export const TeamsPage = () => {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
@@ -115,15 +115,12 @@ export const TeamsPage = () => {
           <div className="space-y-5">
             <div>
               <label className="text-xs uppercase tracking-[0.22em] text-slate-500">Search teams</label>
-              <div className="relative mt-3">
-                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Boston, Atlantic, BOS..."
-                  className="field-shell py-3 pl-12 pr-4"
-                />
-              </div>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Boston, Atlantic, BOS..."
+                className="field-shell mt-3 px-4 py-3"
+              />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
@@ -254,7 +251,7 @@ export const TeamsPage = () => {
                       <td className="relative px-5 py-4 align-middle">
                         <span
                           className="absolute bottom-4 left-0 top-4 w-[2px] rounded-full"
-                          style={{ backgroundColor: hexToRgba(team.brandColor || '#c96a2b', 0.45) }}
+                          style={{ backgroundColor: hexToRgba(team.brandColor || '#e41c38', 0.45) }}
                         />
                         <span className="text-sm font-semibold text-slate-500">#{index + 1}</span>
                       </td>
@@ -303,7 +300,7 @@ export const TeamsPage = () => {
                   key={team.id}
                   to={`/teams/${team.id}`}
                   className="table-row block border-l-2 border-l-transparent px-5 py-4"
-                  style={{ borderLeftColor: hexToRgba(team.brandColor || '#c96a2b', 0.45) }}
+                  style={{ borderLeftColor: hexToRgba(team.brandColor || '#e41c38', 0.45) }}
                 >
                   <div className="flex items-start gap-4">
                     <div className="pt-1 text-sm font-semibold text-slate-500">#{index + 1}</div>

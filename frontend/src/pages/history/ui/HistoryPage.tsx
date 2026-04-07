@@ -41,7 +41,7 @@ export const HistoryPage = () => {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-16 w-16 rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b] animate-spin" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
@@ -96,7 +96,7 @@ export const HistoryPage = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold text-white">{winner?.name}</p>
-                      <p className="mt-1 text-sm text-emerald-100">{Math.max(prediction.probabilityTeam1, prediction.probabilityTeam2)}% win probability</p>
+                      <p className="mt-1 text-sm text-[var(--accent-soft)]">{Math.max(prediction.probabilityTeam1, prediction.probabilityTeam2)}% win probability</p>
                     </div>
                   </div>
                 </GlowingCard>

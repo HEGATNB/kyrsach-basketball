@@ -31,7 +31,7 @@ export const VideoBackground = ({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      {!isVideoLoaded && <div className="absolute inset-0 bg-[linear-gradient(180deg,#08111e,#050b14)]" />}
+      {!isVideoLoaded && <div className="absolute inset-0 bg-[linear-gradient(180deg,#120d09,#090604)]" />}
 
       <video
         ref={videoRef}
@@ -44,7 +44,7 @@ export const VideoBackground = ({
         className="absolute inset-0 h-full w-full object-cover"
         style={{
           opacity: isVideoLoaded ? 1 : 0,
-          filter: 'blur(0px) saturate(0.92) contrast(1.06) brightness(0.58)',
+          filter: 'blur(0px) saturate(0.72) contrast(1.04) brightness(0.42)',
           transition: 'opacity 900ms ease',
         }}
       >
@@ -52,7 +52,7 @@ export const VideoBackground = ({
       </video>
 
       <div
-        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,10,0.76),rgba(5,7,10,0.26),rgba(5,7,10,0.82))]"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(11,8,6,0.9),rgba(11,8,6,0.38),rgba(11,8,6,0.92))]"
         style={{ opacity: overlayOpacity }}
       />
     </div>

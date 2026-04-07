@@ -5,6 +5,7 @@ import { apiRequest, type Team } from '@/shared/api/client';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
 import { TeamMark } from '@/shared/ui/TeamMark';
+import { TeamSelect } from '@/shared/ui/TeamSelect';
 
 export const PredictionNewPage = () => {
   const { user } = useAuth();
@@ -84,7 +85,7 @@ export const PredictionNewPage = () => {
   if (loadingTeams) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(216,180,106,0.22)] border-t-[#c96a2b]" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-[rgba(232,161,67,0.2)] border-t-[var(--accent)]" />
       </div>
     );
   }
@@ -114,7 +115,7 @@ export const PredictionNewPage = () => {
           <div className="mt-5 space-y-3">
             {[selectedTeams.home, selectedTeams.away].map((team, index) => (
               <div key={index} className="surface-muted flex items-center gap-4">
-                <TeamMark team={team} size="md" />
+                <TeamMark team={team} size="md" className="h-16 w-16 rounded-[18px]" />
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{index === 0 ? 'Home side' : 'Away side'}</p>
                   <p className="mt-1 truncate text-lg font-semibold text-white">{team?.name || 'Select a team'}</p>
@@ -128,18 +129,17 @@ export const PredictionNewPage = () => {
         </GlowingCard>
       </section>
 
-      <GlowingCard glowColor="green" className="p-8">
+      <GlowingCard glowColor="green" className="overflow-visible p-8">
         <div className="grid gap-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
           <div className="space-y-3">
             <label className="text-xs uppercase tracking-[0.26em] text-[rgba(236,216,171,0.72)]">Home team</label>
-            <select value={team1Id} onChange={(event) => setTeam1Id(event.target.value)} className="field-shell px-4 py-4 text-lg font-semibold">
-              <option value="">Choose the home side</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name} ({team.wins}-{team.losses})
-                </option>
-              ))}
-            </select>
+            <TeamSelect
+              value={team1Id}
+              onChange={setTeam1Id}
+              teams={teams}
+              placeholder="Choose the home side"
+              searchPlaceholder="Search the home team..."
+            />
           </div>
 
           <div className="flex items-center justify-center">
@@ -148,14 +148,13 @@ export const PredictionNewPage = () => {
 
           <div className="space-y-3">
             <label className="text-xs uppercase tracking-[0.26em] text-[rgba(214,225,235,0.72)]">Away team</label>
-            <select value={team2Id} onChange={(event) => setTeam2Id(event.target.value)} className="field-shell px-4 py-4 text-lg font-semibold">
-              <option value="">Choose the away side</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name} ({team.wins}-{team.losses})
-                </option>
-              ))}
-            </select>
+            <TeamSelect
+              value={team2Id}
+              onChange={setTeam2Id}
+              teams={teams}
+              placeholder="Choose the away side"
+              searchPlaceholder="Search the away team..."
+            />
           </div>
         </div>
 

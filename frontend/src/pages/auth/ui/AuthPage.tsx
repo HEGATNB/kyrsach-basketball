@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, BarChart3, Eye, EyeOff, History, Lock, Mail, ShieldCheck, User2 } from 'lucide-react';
+import { ArrowRight, BarChart3, Eye, EyeOff, History, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
+import { BrandLogo } from '@/shared/ui/BrandLogo';
 
 const DEMO_ACCOUNTS = [
   {
@@ -101,13 +102,11 @@ export default function AuthPage() {
           <span className="data-chip">Node API + Postgres</span>
         </div>
 
-        <div className="mt-6 flex items-start gap-4">
-          <div className="brand-mark-cool flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
+        <div className="mt-6 space-y-5">
+          <BrandLogo size="lg" />
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-[rgba(214,225,235,0.72)]">Secure workspace access</p>
-            <h1 className="mt-2 max-w-xl text-4xl font-semibold leading-tight text-white">
+            <p className="text-xs uppercase tracking-[0.28em] text-[var(--accent-soft)]">Secure workspace access</p>
+            <h1 className="mt-3 max-w-xl text-4xl font-semibold leading-tight text-white">
               Sign in with cleaner access and real workspace context.
             </h1>
           </div>
@@ -210,41 +209,34 @@ export default function AuthPage() {
                 className="space-y-2"
               >
                 <label className="text-sm font-medium text-slate-300">Full name</label>
-                <div className="relative">
-                  <User2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    required={!isLogin}
-                    autoComplete="name"
-                    placeholder="Alexey Analyst"
-                    className="field-shell py-3 pl-12 pr-4"
-                  />
-                </div>
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required={!isLogin}
+                  autoComplete="name"
+                  placeholder="Alexey Analyst"
+                  className="field-shell px-4 py-3"
+                />
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-300">{isLogin ? 'Email or login' : 'Email'}</label>
-            <div className="relative">
-              <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-              <input
-                type={isLogin ? 'text' : 'email'}
-                value={isLogin ? identifier : email}
-                onChange={(event) => (isLogin ? setIdentifier(event.target.value) : setEmail(event.target.value))}
-                required
-                autoComplete={isLogin ? 'username' : 'email'}
-                placeholder={isLogin ? 'admin@sys.com or admin' : 'alex@example.com'}
-                className="field-shell py-3 pl-12 pr-4"
-              />
-            </div>
+            <input
+              type={isLogin ? 'text' : 'email'}
+              value={isLogin ? identifier : email}
+              onChange={(event) => (isLogin ? setIdentifier(event.target.value) : setEmail(event.target.value))}
+              required
+              autoComplete={isLogin ? 'username' : 'email'}
+              placeholder={isLogin ? 'admin@sys.com or admin' : 'alex@example.com'}
+              className="field-shell px-4 py-3"
+            />
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-300">Password</label>
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
@@ -252,12 +244,12 @@ export default function AuthPage() {
                 required
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
                 placeholder={isLogin ? 'Enter your password' : 'Create a secure password'}
-                className="field-shell py-3 pl-12 pr-12"
+                className="field-shell py-3 pl-4 pr-14"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((current) => !current)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-white"
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-white"
               >
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
