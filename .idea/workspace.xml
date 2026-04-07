@@ -4,46 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ad338a1b-d187-4e5b-b2d1-afb99a47c771" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/frontend/src/app/providers/AppRouter.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/app/router.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/assets/score-logo.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/assets/score-mark.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/pages/login/ui/LoginPage.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/pages/team-create/ui/TeamCreatePage.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/shared/lib/playerDisplay.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/shared/ui/BrandLogo.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/shared/ui/ParallaxCourt.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/shared/ui/TeamSelect.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/widgets/layout/ui/MainLayout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/app/Layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/Layout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/index.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/admin/ui/AdminPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/admin/ui/AdminPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/analytics/ui/AnalyticsPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/analytics/ui/AnalyticsPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/auth/ui/AuthPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/auth/ui/AuthPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/history/ui/HistoryPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/history/ui/HistoryPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/home/ui/HomePage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/home/ui/HomePage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/matches/ui/MatchPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/matches/ui/MatchPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/matches/ui/MatchesPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/matches/ui/MatchesPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/players/ui/PlayersPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/players/ui/PlayersPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/prediction-new/ui/PredictionNewPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/prediction-new/ui/PredictionNewPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/prediction-result/ui/PredictionResultPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/prediction-result/ui/PredictionResultPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/teams/ui/TeamPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/teams/ui/TeamPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/teams/ui/TeamsPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/teams/ui/TeamsPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/api/client.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/api/client.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/lib/teamBrand.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/lib/teamBrand.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/Charts.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/Charts.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/GlowingCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/GlowingCard.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/LoadingSpinner.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/LoadingSpinner.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/PlayerCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/PlayerCard.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/TeamMark.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/TeamMark.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/VideoBackground.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/VideoBackground.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/vite.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/vite.config.js" afterDir="false" />
-    </list>
+    <list default="true" id="ad338a1b-d187-4e5b-b2d1-afb99a47c771" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
