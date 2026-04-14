@@ -1,3 +1,5 @@
+import logoImage from '../../assets/logo.png';
+
 interface BrandLogoProps {
   size?: 'sm' | 'md' | 'lg';
   showTagline?: boolean;
@@ -8,20 +10,20 @@ interface BrandLogoProps {
 const sizeStyles = {
   sm: {
     root: 'gap-1.5',
-    word: 'text-[26px]',
-    ball: 26,
+    width: 80,
+    height: 45,
     tagline: 'text-[9px]',
   },
   md: {
     root: 'gap-2',
-    word: 'text-[32px]',
-    ball: 32,
+    width: 250,
+    height: 68,
     tagline: 'text-[10px]',
   },
   lg: {
     root: 'gap-2.5',
-    word: 'text-[46px] sm:text-[52px]',
-    ball: 46,
+    width: 180,
+    height: 101,
     tagline: 'text-[11px]',
   },
 };
@@ -38,19 +40,14 @@ export function BrandLogo({
   return (
     <div className={`inline-flex flex-col ${alignment} ${className}`}>
       <div className={`inline-flex items-center ${config.root}`}>
-        <span className={`brand-wordmark ${config.word}`}>SC</span>
-
-        <span
-          className="brand-ball"
-          aria-hidden="true"
-          style={{ width: `${config.ball}px`, height: `${config.ball}px` }}
-        >
-          <span className="brand-ball-equator" />
-          <span className="brand-ball-arc brand-ball-arc-left" />
-          <span className="brand-ball-arc brand-ball-arc-right" />
-        </span>
-
-        <span className={`brand-wordmark ${config.word}`}>RE</span>
+        <img
+          src={logoImage}
+          alt="ScoreCore Logo"
+          width={config.width}
+          height={config.height}
+          className="object-contain"
+          style={{ width: `${config.width}px`, height: 'auto' }}
+        />
       </div>
 
       {showTagline && (

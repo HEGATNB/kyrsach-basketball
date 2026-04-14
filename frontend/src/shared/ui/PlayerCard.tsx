@@ -82,7 +82,7 @@ export function PlayerCard({ player, delay = 0, onOpenDetails }: PlayerCardProps
             <img
               src={playerImageUrl}
               alt={formatPlayerName(player)}
-              className="h-[132px] w-full object-cover object-top"
+              className="h-[150px] w-full object-cover object-top"
               loading="lazy"
               decoding="async"
               onError={(event) => {
