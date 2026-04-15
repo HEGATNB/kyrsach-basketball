@@ -59,6 +59,7 @@ export function PlayerCard({ player, delay = 0, onOpenDetails }: PlayerCardProps
               {player.position || 'Player'} {player.number ? `/ #${player.number}` : ''}
             </p>
             <h3 className="mt-3 text-2xl font-semibold text-white">{formatPlayerName(player)}</h3>
+            {/* Блок с командой и сезоном */}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span
                 className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em]"
@@ -70,10 +71,13 @@ export function PlayerCard({ player, delay = 0, onOpenDetails }: PlayerCardProps
               >
                 {teamLabel}
               </span>
-              <span className="text-xs uppercase tracking-[0.18em] text-slate-500">{player.season || 'Season n/a'}</span>
+
+              {/* Только текущий сезон, без переключателя */}
+              <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                {player.season || 'Season n/a'}
+              </span>
             </div>
           </div>
-
           <TeamMark team={player.team} size="sm" />
         </div>
 

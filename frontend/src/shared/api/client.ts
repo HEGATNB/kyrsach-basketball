@@ -47,6 +47,7 @@ export interface Player {
   id: number;
   first_name: string;
   last_name: string;
+  full_name?: string;
   number?: string;
   position?: string;
   team_id: number;
@@ -63,6 +64,7 @@ export interface Player {
   team?: Team;
   games_played?: number;
   season?: string;
+  seasons?: string[];
   college?: string;
   country?: string;
   draft_year?: string;
@@ -265,6 +267,7 @@ function normalizePlayer(raw: any): Player {
     image_url: raw?.image_url || undefined,
     games_played: raw?.games_played,
     season: raw?.season,
+    seasons: Array.isArray(raw?.seasons) ? raw.seasons : (raw?.season ? [raw.season] : []),
     college: raw?.college,
     country: raw?.country,
     draft_year: raw?.draft_year,

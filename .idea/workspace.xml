@@ -5,14 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ad338a1b-d187-4e5b-b2d1-afb99a47c771" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/frontend/src/assets/logo.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/src/assets/logo_v5.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/shared/ui/Footer.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/shared/ui/SeasonSelector.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/kyrsach-basketball.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/kyrsach-basketball.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/BrandLogo.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/BrandLogo.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/controllers/players.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/controllers/players.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/schemas.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/services/player_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/services/player_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/public/vite.svg" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/public/vite.svg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/players/ui/PlayersPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/players/ui/PlayersPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/shared/api/client.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/api/client.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/PlayerCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/PlayerCard.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/shared/ui/TeamMark.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/shared/ui/TeamMark.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -57,11 +63,12 @@
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;feature/Akella&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/DELL/Desktop/basketball/kyrsach-basketball/frontend/src/assets&quot;
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/DELL/Desktop/basketball/kyrsach-basketball/frontend/public&quot;
   }
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\DELL\Desktop\basketball\kyrsach-basketball\frontend\public" />
       <recent name="C:\Users\DELL\Desktop\basketball\kyrsach-basketball\frontend\src\assets" />
     </key>
   </component>

@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from 'react';
 import { Sparkles, Users, X } from 'lucide-react';
 import { apiRequest, type Player, type Team } from '@/shared/api/client';
@@ -15,45 +16,9 @@ import { hexToRgba } from '@/shared/lib/teamBrand';
 import { GlowingCard } from '@/shared/ui/GlowingCard';
 import { PlayerCard } from '@/shared/ui/PlayerCard';
 import { TeamMark } from '@/shared/ui/TeamMark';
+import { SeasonSelector } from '@/shared/ui/SeasonSelector';
 
 type PlayersView = 'cards' | 'board';
-
-function normalizeLookup(value?: string | null) {
-  return value?.trim().toUpperCase() || '';
-}
-
-function mergePlayersWithTeams(players: Player[], teams: Team[]) {
-  const teamsByAbbrev = new Map(teams.map((team) => [normalizeLookup(team.abbrev), team]));
-  const teamsByName = new Map(teams.map((team) => [normalizeLookup(team.name), team]));
-
-  return players.map((player) => {
-    const resolvedTeam =
-      teamsByAbbrev.get(normalizeLookup(player.team_abbrev || player.team?.abbrev)) ||
-      teamsByName.get(normalizeLookup(player.team?.name));
-
-    if (!resolvedTeam) {
-      return player;
-    }
-
-    return {
-      ...player,
-      team_id: player.team_id || resolvedTeam.id,
-      team: {
-        ...resolvedTeam,
-        ...player.team,
-        id: resolvedTeam.id,
-        name: resolvedTeam.name,
-        city: resolvedTeam.city,
-        abbrev: resolvedTeam.abbrev,
-        arena: resolvedTeam.arena,
-        foundedYear: resolvedTeam.foundedYear,
-        logoUrl: resolvedTeam.logoUrl || player.team?.logoUrl,
-        brandColor: resolvedTeam.brandColor || player.team?.brandColor,
-        accentColor: resolvedTeam.accentColor || player.team?.accentColor,
-      },
-    };
-  });
-}
 
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
@@ -71,45 +36,104 @@ export default function PlayersPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<PlayersView>('cards');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [seasonDataCache, setSeasonDataCache] = useState<Record<string, Player>>({});
 
   useEffect(() => {
     const load = async () => {
       try {
         const [playersData, teamsData] = await Promise.all([
-          apiRequest<Player[]>('/players'),
+          apiRequest<Player[]>('/players?min_games=0'),
           apiRequest<Team[]>('/teams'),
         ]);
 
         setTeams(teamsData);
-        setPlayers(
-          mergePlayersWithTeams(playersData, teamsData).sort(
-            (left, right) => right.points_per_game - left.points_per_game,
-          ),
-        );
+        setPlayers(playersData);
       } catch (error) {
         console.error('Failed to load players or teams', error);
       } finally {
         setLoading(false);
       }
     };
-
     load();
   }, []);
 
-  useEffect(() => {
-    if (!selectedPlayer) {
+  const loadPlayerSeasonData = async (playerName: string, season: string): Promise<Player | null> => {
+    if (!playerName || playerName === 'undefined' || playerName === ' ') {
+      console.error('Invalid player name for season data loading');
+      return null;
+    }
+
+    const cacheKey = `${playerName}_${season}`;
+
+    if (seasonDataCache[cacheKey]) {
+      console.log(`Using cached data for ${playerName} - ${season}`);
+      return seasonDataCache[cacheKey];
+    }
+
+    try {
+      console.log(`Fetching data for ${playerName} - ${season}`);
+
+      const encodedName = encodeURIComponent(playerName);
+      const url = `/players?search=${encodedName}&season=${season}&min_games=0`;
+
+      const playersData = await apiRequest<Player[]>(url);
+
+      console.log(`Received ${playersData.length} records for ${playerName} - ${season}`);
+
+      const playerData = playersData.find(p => {
+        const pName = p.full_name || formatPlayerName(p);
+        return pName === playerName;
+      });
+
+      if (playerData) {
+        console.log(`Found player data for season ${season}:`, playerData);
+
+        setSeasonDataCache(prev => ({
+          ...prev,
+          [cacheKey]: playerData,
+        }));
+
+        return playerData;
+      } else {
+        console.warn(`No data found for ${playerName} in season ${season}`);
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to load player season data', error);
+      return null;
+    }
+  };
+  const handleSeasonChange = async (player: Player, newSeason: string) => {
+    const playerName = player.full_name || formatPlayerName(player);
+
+    console.log(`Changing season for ${playerName} to ${newSeason}`);
+
+    if (!playerName || playerName === ' ') {
+      console.error('Invalid player name:', player);
       return;
     }
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSelectedPlayer(null);
-      }
-    };
+    const seasonData = await loadPlayerSeasonData(playerName, newSeason);
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedPlayer]);
+    if (seasonData) {
+      setSelectedPlayer({
+        ...player,
+        ...seasonData,
+        season: newSeason,
+        seasons: player.seasons,
+      });
+      setPlayers(prevPlayers =>
+        prevPlayers.map(p => {
+          const pName = p.full_name || formatPlayerName(p);
+          return pName === playerName
+            ? { ...p, ...seasonData, season: newSeason }
+            : p;
+        })
+      );
+    } else {
+      console.error(`Failed to load season data for ${playerName} - ${newSeason}`);
+    }
+  };
 
   const filteredPlayers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -140,17 +164,21 @@ export default function PlayersPage() {
     () => [...filteredPlayers].sort((left, right) => right.points_per_game - left.points_per_game)[0],
     [filteredPlayers],
   );
+
   const topPlaymaker = useMemo(
     () => [...filteredPlayers].sort((left, right) => right.assists_per_game - left.assists_per_game)[0],
     [filteredPlayers],
   );
+
   const averagePoints =
     filteredPlayers.length > 0
       ? filteredPlayers.reduce((sum, player) => sum + player.points_per_game, 0) / filteredPlayers.length
       : 0;
+
   const visibleTeams = new Set(
     filteredPlayers.map((player) => player.team?.abbrev || player.team_abbrev || player.team?.name || 'NBA'),
   ).size;
+
   const seasonCount = new Set(filteredPlayers.map((player) => player.season).filter(Boolean)).size;
   const selectedPlayerTint = selectedPlayer?.team?.brandColor || '#d07939';
 
@@ -166,14 +194,13 @@ export default function PlayersPage() {
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-soft)]">Player database</p>
                 <h1 className="mt-2 font-spacegrotesk text-3xl font-bold text-white sm:text-4xl">
-                  Cleaner roster cards built from season data.
+                  Player profiles grouped by name with season switcher
                 </h1>
               </div>
             </div>
 
             <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-base">
-              Team context is now merged from the team dataset, while player cards focus on season, games, age, school
-              and actual box-score output from the database instead of decorative scouting copy.
+              Click on a player card to view detailed profile and switch between seasons.
             </p>
           </div>
 
@@ -187,7 +214,7 @@ export default function PlayersPage() {
                 className="field-shell mt-3 px-4 py-3"
               />
               <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-                {teams.length} teams synced for logos and context.
+                {players.length} players loaded, grouped by name
               </p>
             </div>
 
@@ -233,7 +260,7 @@ export default function PlayersPage() {
           </div>
           <div className="surface-muted text-sm text-slate-300">
             <Sparkles className="mr-2 inline h-4 w-4 text-[var(--accent)]" />
-            {visibleTeams} team contexts merged into player cards from the team dataset.
+            {visibleTeams} team contexts merged into player cards.
           </div>
         </div>
       </GlowingCard>
@@ -246,7 +273,7 @@ export default function PlayersPage() {
         <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {filteredPlayers.map((player, index) => (
             <PlayerCard
-              key={player.id}
+              key={`${player.id}_${player.full_name || formatPlayerName(player)}`}
               player={player}
               delay={index * 0.03}
               onOpenDetails={() => setSelectedPlayer(player)}
@@ -297,7 +324,7 @@ export default function PlayersPage() {
                   const fallbackImage = getPlayerFallbackImage(player);
 
                   return (
-                    <tr key={player.id} className="border-t border-white/6 transition-colors hover:bg-white/[0.03]">
+                    <tr key={`${player.id}_${player.full_name || formatPlayerName(player)}`} className="border-t border-white/6 transition-colors hover:bg-white/[0.03]">
                       <td className="px-5 py-4 align-middle">
                         <div className="flex min-w-0 items-center gap-4">
                           <img
@@ -331,7 +358,9 @@ export default function PlayersPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-middle text-sm text-white">{player.season || 'N/A'}</td>
+                      <td className="px-5 py-4 align-middle">
+                        <span className="text-sm text-white">{player.season || 'N/A'}</span>
+                      </td>
                       <td className="px-5 py-4 text-right align-middle text-sm tabular-nums text-white">
                         {formatPlayerGames(player.games_played)}
                       </td>
@@ -357,7 +386,7 @@ export default function PlayersPage() {
               const fallbackImage = getPlayerFallbackImage(player);
 
               return (
-                <div key={player.id} className="border-b border-white/6 p-5 last:border-0">
+                <div key={`${player.id}_${player.full_name || formatPlayerName(player)}`} className="border-b border-white/6 p-5 last:border-0">
                   <div className="flex min-w-0 items-center gap-4">
                     <img
                       src={playerImageUrl}
@@ -376,7 +405,7 @@ export default function PlayersPage() {
                         onClick={() => setSelectedPlayer(player)}
                         className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500 transition hover:text-white"
                       >
-                        {player.season || 'Season n/a'} • {player.position || 'Player'}
+                        {player.position || 'Player'} {player.number ? `• #${player.number}` : ''}
                       </button>
                     </div>
                   </div>
@@ -387,6 +416,11 @@ export default function PlayersPage() {
                       <TeamMark team={player.team} size="sm" />
                       <span className="truncate text-sm text-white">{player.team?.abbrev || player.team_abbrev || 'NBA'}</span>
                     </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-4">
+                    <span className="text-xs uppercase tracking-[0.18em] text-slate-500">Season</span>
+                    <span className="text-sm text-white">{player.season || 'N/A'}</span>
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -402,7 +436,6 @@ export default function PlayersPage() {
           </div>
         </GlowingCard>
       )}
-
       {selectedPlayer && (
         <div
           className="fixed inset-0 z-50 bg-[rgba(3,4,6,0.76)] px-4 py-8 backdrop-blur-md"
@@ -442,6 +475,17 @@ export default function PlayersPage() {
                       <p className="mt-2 text-sm uppercase tracking-[0.18em] text-slate-300">
                         {selectedPlayer.team?.name || selectedPlayer.team_abbrev || 'NBA roster'}
                       </p>
+                      
+                      {selectedPlayer.seasons && selectedPlayer.seasons.length > 1 && (
+                        <div className="mt-4">
+                          <SeasonSelector
+                            seasons={selectedPlayer.seasons}
+                            currentSeason={selectedPlayer.season || selectedPlayer.seasons[0]}
+                            onSeasonChange={(season) => handleSeasonChange(selectedPlayer, season)}
+                          />
+                        </div>
+                      )}
+                      
                       <p className="mt-3 text-sm leading-6 text-slate-300">
                         {selectedPlayer.season || 'Season n/a'} season • {formatPlayerGames(selectedPlayer.games_played)} GP •{' '}
                         {selectedPlayer.points_per_game.toFixed(1)} PTS • {selectedPlayer.rebounds_per_game.toFixed(1)} REB •{' '}

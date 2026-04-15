@@ -17,7 +17,7 @@ async def get_all_players(
     team: Optional[str] = Query(None, description="Filter by team abbreviation"),
     season: Optional[str] = Query(None, description="Filter by season"),
     search: Optional[str] = Query(None, description="Search by player name"),
-    min_games: int = Query(5, ge=0, description="Minimum games played"),
+    min_games: int = Query(0, ge=0, description="Minimum games played"),
     sort_by: str = Query("pts", regex="^(pts|reb|ast|player_name|gp|season)$"),
     sort_order: str = Query("desc", regex="^(asc|desc)$"),
     skip: int = Query(0, ge=0),
