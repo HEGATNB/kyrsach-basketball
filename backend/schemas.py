@@ -14,7 +14,6 @@ class UserCreate(UserBase):
 
 
 class UserLogin(BaseModel):
-    # Может быть email или username
     identifier: str
     password: str
 
@@ -56,7 +55,7 @@ class PlayerBase(BaseModel):
     number: Optional[str] = None
     position: Optional[str] = None
     height: Optional[str] = None
-    weight: Optional[float] = None  # меняем с Optional[str] на Optional[float]
+    weight: Optional[float] = None
     birth_date: Optional[str] = None
     country: Optional[str] = None
     team_abbrev: Optional[str] = None
@@ -65,6 +64,7 @@ class PlayerBase(BaseModel):
 
     # Статистика
     season: Optional[str] = None
+    seasons: Optional[List[str]] = None
     points_per_game: float = 0
     rebounds_per_game: float = 0
     assists_per_game: float = 0
@@ -86,11 +86,13 @@ class PlayerBase(BaseModel):
     draft_number: Optional[str] = None
     college: Optional[str] = None
 
+
 class PlayerResponse(PlayerBase):
     id: int
 
     class Config:
         from_attributes = True
+
 
 class TeamCreate(TeamBase):
     conference_id: Optional[int] = None
@@ -217,6 +219,7 @@ class AuditLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class BackupResponse(BaseModel):
     id: str
