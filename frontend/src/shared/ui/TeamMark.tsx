@@ -65,7 +65,7 @@ export function TeamMark({ team, size = 'md', className = '' }: TeamMarkProps) {
         <img
           src={logoUrl}
           alt={`${team?.name || brand.name} logo`}
-          className="h-[74%] w-[74%] object-contain"
+          className="h-[100%] w-[100%] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.28)]"
           loading="lazy"
           decoding="async"
           onError={() => setBroken(true)}

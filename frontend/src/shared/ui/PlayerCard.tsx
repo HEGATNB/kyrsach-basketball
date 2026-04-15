@@ -1,73 +1,43 @@
-// shared/ui/PlayerCard.tsx
+import type { Player } from '@/shared/api/client';
 import { ArrowUpRight } from 'lucide-react';
+import { formatPlayerGames, getPlayerFallbackImage, getPlayerImageUrl, formatPlayerName, formatPlayerWeight } from '@/shared/lib/playerDisplay';
+import { getTeamBrand, hexToRgba } from '@/shared/lib/teamBrand';
 import { GlowingCard } from './GlowingCard';
 import { TeamMark } from './TeamMark';
-import { getTeamBrand, hexToRgba } from '@/shared/lib/teamBrand';
 
 interface PlayerCardProps {
-  player: {
-    id: number;
-    first_name: string;
-    last_name: string;
-    number?: string;
-    position?: string;
-    height?: string;
-    weight?: number;  // number, НЕ string!
-    minutes_per_game?: number;
-    points_per_game: number;
-    rebounds_per_game: number;
-    assists_per_game: number;
-    image_url?: string;
-    team?: {
-      name: string;
-      abbrev?: string;
-      logoUrl?: string;
-      brandColor?: string;
-      accentColor?: string;
-    };
-  };
-  summary: string;
+  player: Player;
   delay?: number;
   onOpenDetails?: () => void;
 }
 
-// Функция для очистки имени от спецсимволов
-function cleanNameForSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z]/g, '') // Убираем всё кроме букв
-    .substring(0, 5);
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/6 bg-white/[0.02] px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-2 truncate text-sm font-medium text-white">{value}</p>
+    </div>
+  );
 }
 
-// Функция для получения ссылки на фото игрока с basketball-reference.com
-function getPlayerImageUrl(player: PlayerCardProps['player']): string {
-  // Если есть прямой URL, используем его
-  if (player.image_url) return player.image_url;
-
-  const firstName = player.first_name?.toLowerCase() || '';
-  const lastName = player.last_name?.toLowerCase() || '';
-
-  // Очищаем от спецсимволов (апострофы, дефисы и т.д.)
-  const cleanLastName = lastName.replace(/[^a-z]/g, '');
-  const cleanFirstName = firstName.replace(/[^a-z]/g, '');
-
-  // Берем первые 5 букв фамилии и первые 2 буквы имени
-  const lastNamePart = cleanLastName.substring(0, 5);
-  const firstNamePart = cleanFirstName.substring(0, 2);
-  
-  return `https://www.basketball-reference.com/req/202503171/images/players/${lastNamePart}${firstNamePart}01.jpg`;
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-h-[32px] items-center justify-between gap-3 border-b border-white/6 pb-2 text-sm">
+      <span className="text-slate-500">{label}</span>
+      <span className="max-w-[60%] truncate text-right font-medium text-white">{value}</span>
+    </div>
+  );
 }
 
-export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: PlayerCardProps) {
-  const teamBrand = getTeamBrand({ abbrev: player.team?.abbrev, name: player.team?.name });
-  const brandColor = player.team?.brandColor || teamBrand.brandColor;
-  const accentColor = player.team?.accentColor || teamBrand.accentColor;
-  const fallbackImage = player.team?.logoUrl || teamBrand.logoUrl;
+export function PlayerCard({ player, delay = 0, onOpenDetails }: PlayerCardProps) {
+  const teamBrand = getTeamBrand({ abbrev: player.team?.abbrev || player.team_abbrev, name: player.team?.name });
+  const accentColor = player.team?.brandColor || teamBrand.brandColor;
+  const fallbackImage = getPlayerFallbackImage(player);
   const playerImageUrl = getPlayerImageUrl(player);
-  
-  const heroStyle = {
-    background: `linear-gradient(145deg, ${hexToRgba(brandColor, 0.22)}, ${hexToRgba(accentColor, 0.08)} 64%, rgba(7,9,12,0.92) 100%)`,
-    borderColor: hexToRgba(brandColor, 0.26),
+  const teamLabel = player.team?.abbrev || player.team?.name || player.team_abbrev || 'NBA';
+  const teamName = player.team?.name || player.team_abbrev || 'NBA roster';
+  const topGlow = {
+    background: `linear-gradient(180deg, rgba(255,246,229,0.02), rgba(255,246,229,0.01)), radial-gradient(circle at top right, ${hexToRgba(accentColor, 0.12)}, transparent 36%)`,
   };
 
   return (
@@ -77,43 +47,59 @@ export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: Player
       className={`h-full overflow-hidden p-0 ${onOpenDetails ? 'cursor-pointer' : ''}`}
       onClick={onOpenDetails}
     >
-      <div className="border-b border-white/6 p-5" style={heroStyle}>
+      <div className="h-full p-5" style={topGlow}>
+        <div
+          className="mb-5 h-px w-full rounded-full"
+          style={{ background: `linear-gradient(90deg, ${hexToRgba(accentColor, 0.82)}, transparent 78%)` }}
+        />
+
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">
-              {player.position || 'Player'} / #{player.number || '--'}
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+              {player.position || 'Player'} {player.number ? `/ #${player.number}` : ''}
             </p>
-            <h3 className="mt-3 text-2xl font-semibold text-white">
-              {player.first_name} {player.last_name}
-            </h3>
-            <p className="mt-1 text-sm text-slate-200">{player.team?.name || 'NBA roster'}</p>
+            <h3 className="mt-3 text-2xl font-semibold text-white">{formatPlayerName(player)}</h3>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{
+                  color: hexToRgba(accentColor, 1),
+                  borderColor: hexToRgba(accentColor, 0.24),
+                  background: hexToRgba(accentColor, 0.1),
+                }}
+              >
+                {teamLabel}
+              </span>
+              <span className="text-xs uppercase tracking-[0.18em] text-slate-500">{player.season || 'Season n/a'}</span>
+            </div>
           </div>
+
           <TeamMark team={player.team} size="sm" />
         </div>
 
-        <div className="mt-5 flex items-end gap-4">
-          <div className="h-28 w-24 shrink-0 overflow-hidden rounded-[14px] border border-white/10 bg-black/20">
+        <div className="mt-5 grid gap-4 sm:grid-cols-[104px_minmax(0,1fr)]">
+          <div className="overflow-hidden rounded-[18px] border border-white/8 bg-[rgba(255,255,255,0.02)]">
             <img
               src={playerImageUrl}
-              alt={`${player.first_name} ${player.last_name}`}
-              className="h-full w-full object-cover object-top"
+              alt={formatPlayerName(player)}
+              className="h-[150px] w-full object-cover object-top"
               loading="lazy"
               decoding="async"
               onError={(event) => {
-                // Если фото игрока не загрузилось, показываем логотип команды
                 (event.target as HTMLImageElement).src = fallbackImage;
               }}
             />
           </div>
 
-          <div className="min-h-[84px] flex-1">
-            <p className="text-sm leading-6 text-slate-100">{summary}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <InfoTile label="Season" value={player.season || 'N/A'} />
+            <InfoTile label="Games" value={formatPlayerGames(player.games_played)} />
+            <InfoTile label="Age" value={player.age ? String(player.age) : 'N/A'} />
+            <InfoTile label="Country" value={player.country || 'N/A'} />
           </div>
         </div>
-      </div>
 
-      <div className="p-5">
-        <div className="stat-grid grid-cols-3">
+        <div className="mt-5 stat-grid grid-cols-3">
           <div className="stat-grid-cell">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">PTS</p>
             <p className="mt-2 text-2xl font-semibold tabular-nums text-white">{player.points_per_game.toFixed(1)}</p>
@@ -128,23 +114,11 @@ export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: Player
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div className="flex min-h-[30px] items-center justify-between gap-3 border-b border-white/6 pb-2 text-slate-300">
-            <span className="text-slate-500">Height</span>
-            <span className="font-medium text-white">{player.height || 'N/A'}</span>
-          </div>
-          <div className="flex min-h-[30px] items-center justify-between gap-3 border-b border-white/6 pb-2 text-slate-300">
-            <span className="text-slate-500">Weight</span>
-            <span className="font-medium text-white">{player.weight ? `${Math.round(player.weight)} kg` : 'N/A'}</span>
-          </div>
-          <div className="flex min-h-[30px] items-center justify-between gap-3 text-slate-300">
-            <span className="text-slate-500">Minutes</span>
-            <span className="font-medium tabular-nums text-white">{player.minutes_per_game?.toFixed(1) || 'N/A'}</span>
-          </div>
-          <div className="flex min-h-[30px] items-center justify-between gap-3 text-slate-300">
-            <span className="text-slate-500">Role</span>
-            <span className="font-medium text-white">{player.position || 'Rotation'}</span>
-          </div>
+        <div className="mt-4 grid gap-2">
+          <DetailRow label="Team" value={teamName} />
+          <DetailRow label="Height" value={player.height || player.player_height || 'N/A'} />
+          <DetailRow label="Weight" value={formatPlayerWeight(player.weight || player.player_weight)} />
+          <DetailRow label="College" value={player.college || 'N/A'} />
         </div>
 
         {onOpenDetails && (
@@ -155,7 +129,7 @@ export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: Player
             }}
             className="btn-secondary mt-5 w-full justify-between"
           >
-            Open scout report
+            Open player profile
             <ArrowUpRight className="h-4 w-4" />
           </button>
         )}
@@ -163,3 +137,5 @@ export function PlayerCard({ player, summary, delay = 0, onOpenDetails }: Player
     </GlowingCard>
   );
 }
+
+export default PlayerCard;
