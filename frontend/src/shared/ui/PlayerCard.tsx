@@ -1,6 +1,5 @@
 import type { Player } from '@/shared/api/client';
 import { ArrowUpRight } from 'lucide-react';
-import { formatPlayerGames, getPlayerFallbackImage, getPlayerImageUrl, formatPlayerName, formatPlayerWeight } from '@/shared/lib/playerDisplay';
 import { getTeamBrand, hexToRgba } from '@/shared/lib/teamBrand';
 import { GlowingCard } from './GlowingCard';
 import { TeamMark } from './TeamMark';
@@ -9,6 +8,36 @@ interface PlayerCardProps {
   player: Player;
   delay?: number;
   onOpenDetails?: () => void;
+}
+
+function formatPlayerName(player: Player) {
+  return player.full_name || `${player.first_name} ${player.last_name}`.trim();
+}
+
+function formatPlayerGames(games?: number) {
+  return games?.toString() || 'N/A';
+}
+
+function formatPlayerWeight(weight?: number | string) {
+  if (!weight) return 'N/A';
+  const num = typeof weight === 'string' ? parseFloat(weight) : weight;
+  return isNaN(num) ? 'N/A' : `${Math.round(num)} kg`;
+}
+
+function getPlayerImageUrl(player: Player) {
+  if (player.image_url) return player.image_url;
+
+  const firstName = player.first_name?.toLowerCase().replace(/[^a-z]/g, '') || '';
+  const lastName = player.last_name?.toLowerCase().replace(/[^a-z]/g, '') || '';
+  const lastNamePart = lastName.slice(0, 5);
+  const firstNamePart = firstName.slice(0, 2);
+
+  return `https://www.basketball-reference.com/req/202503171/images/players/${lastNamePart}${firstNamePart}01.jpg`;
+}
+
+function getPlayerFallbackImage(player: Player) {
+  if (player.team?.logoUrl) return player.team.logoUrl;
+  return getTeamBrand({ abbrev: player.team?.abbrev || player.team_abbrev }).logoUrl;
 }
 
 function InfoTile({ label, value }: { label: string; value: string }) {
