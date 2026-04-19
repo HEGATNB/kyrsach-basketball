@@ -132,26 +132,46 @@ export const PredictionNewPage = () => {
         <div className="grid gap-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
           <div className="space-y-3">
             <label className="text-xs uppercase tracking-[0.26em] text-[rgba(236,216,171,0.72)]">Home team</label>
-            <select value={team1Id} onChange={(event) => setTeam1Id(event.target.value)} className="field-shell px-4 py-4 text-lg font-semibold">
-              <option value="">Choose the home side</option>
+            <select 
+              value={team1Id} 
+              onChange={(event) => setTeam1Id(event.target.value)} 
+              className="field-shell w-full px-4 py-4 text-lg font-semibold text-white"
+              style={{ backgroundColor: 'rgba(10, 14, 20, 0.8)' }}
+            >
+              <option value="" className="bg-[rgba(10,14,20,0.95)] text-slate-400">
+                Choose the home side
+              </option>
               {teams.map((team) => (
-                <option key={team.id} value={team.id}>
+                <option 
+                  key={team.id} 
+                  value={team.id} 
+                  className="bg-[rgba(10,14,20,0.95)] text-white"
+                >
                   {team.name} ({team.wins}-{team.losses})
                 </option>
               ))}
             </select>
           </div>
-
-          <div className="flex items-center justify-center">
-            <div className="status-pill bg-white/5 text-slate-300">VS</div>
+          <div className="flex items-center justify-center mt-12 lg:mt-14">
+            <div className="status-pill bg-white/5 text-slate-300 text-lg px-6 py-2">VS</div>
           </div>
-
           <div className="space-y-3">
             <label className="text-xs uppercase tracking-[0.26em] text-[rgba(214,225,235,0.72)]">Away team</label>
-            <select value={team2Id} onChange={(event) => setTeam2Id(event.target.value)} className="field-shell px-4 py-4 text-lg font-semibold">
-              <option value="">Choose the away side</option>
+            <select 
+              value={team2Id} 
+              onChange={(event) => setTeam2Id(event.target.value)} 
+              className="field-shell w-full px-4 py-4 text-lg font-semibold text-white"
+              style={{ backgroundColor: 'rgba(10, 14, 20, 0.8)' }}
+            >
+              <option value="" className="bg-[rgba(10,14,20,0.95)] text-slate-400">
+                Choose the away side
+              </option>
               {teams.map((team) => (
-                <option key={team.id} value={team.id}>
+                <option 
+                  key={team.id} 
+                  value={team.id} 
+                  className="bg-[rgba(10,14,20,0.95)] text-white"
+                >
                   {team.name} ({team.wins}-{team.losses})
                 </option>
               ))}

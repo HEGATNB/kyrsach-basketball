@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 
 interface VideoBackgroundProps {
   videoSrc: string;
+  fallbackSrc?: string;
   overlayOpacity?: number;
   playbackSpeed?: number;
 }
 
 export const VideoBackground = ({
   videoSrc,
+  fallbackSrc = '/videos/basketball-bg.mp4',
   overlayOpacity = 0.18,
   playbackSpeed = 1,
 }: VideoBackgroundProps) => {
@@ -15,18 +17,9 @@ export const VideoBackground = ({
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
   useEffect(() => {
-    if (!videoRef.current) {
-      return;
-    }
-
+    if (!videoRef.current) return;
     videoRef.current.playbackRate = playbackSpeed;
-    const playPromise = videoRef.current.play();
-
-    if (playPromise) {
-      playPromise.catch(() => {
-        // Browser autoplay restrictions are fine here.
-      });
-    }
+    videoRef.current.play().catch(() => {});
   }, [playbackSpeed]);
 
   return (
@@ -48,7 +41,8 @@ export const VideoBackground = ({
           transition: 'opacity 900ms ease',
         }}
       >
-        <source src={videoSrc} type="video/mp4" />
+        <source src={videoSrc} type='video/mp4; codecs="hvc1"' />
+        <source src={fallbackSrc} type="video/mp4" />
       </video>
 
       <div

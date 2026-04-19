@@ -15,6 +15,7 @@ import { VideoBackground } from '../shared/ui/VideoBackground';
 import { Footer } from '../shared/ui/Footer';
 import { useAuth } from './providers/AuthProvider';
 import { BrandLogo } from '@/shared/ui/BrandLogo';
+import { CookieAccept } from '../shared/ui/CookieAccept';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Dashboard' },
@@ -32,7 +33,12 @@ export const Layout = () => {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[var(--page-bg)] text-[var(--text-main)]">
-      <VideoBackground videoSrc="/videos/basketball-bg.mp4" overlayOpacity={0.24} playbackSpeed={0.82} />
+      <VideoBackground
+          videoSrc="/videos/Basketball-Bg_hevc.mp4"
+          fallbackSrc="/videos/basketball-bg.mp4"
+          overlayOpacity={0.24}
+          playbackSpeed={0.82}
+      />
       <div className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_top_left,rgba(232,161,67,0.12),transparent_24%),linear-gradient(180deg,rgba(9,6,4,0.28),rgba(9,6,4,0.62),rgba(9,6,4,0.92))]" />
 
       <div className="relative z-10 flex flex-1 flex-col">
@@ -132,11 +138,12 @@ export const Layout = () => {
           copyrightText="© 2026 Score Team"
           contactEmail="hegatnb@mail.ru"
           socialLinks={{
-            telegram: "https://t.me/score",
-            vk: "https://vk.com/score"
+            telegram: "https://t.me/score_website",
+            vk: "https://vk.com/score_website"
           }}
         />
       </div>
+      <CookieAccept />
     </div>
   );
 };
