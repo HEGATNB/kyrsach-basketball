@@ -1,8 +1,6 @@
-// shared/ui/Footer.tsx
 import { Mail, Check } from 'lucide-react';
 import { useState } from 'react';
 
-// ✅ Правильная SVG иконка Telegram
 const TelegramIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
@@ -14,15 +12,18 @@ const TelegramIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// ✅ Правильная SVG иконка VK (логотип ВКонтакте)
 const VKIcon = ({ className }: { className?: string }) => (
   <svg
     className={className}
     viewBox="0 0 48 48"
-    fill="currentColor"
+    fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4zm-2.65 28.3c-1.13 0-2.05-.4-2.75-1.2-.7-.8-1.05-1.8-1.05-3 0-.8.1-1.6.3-2.4.2-.8.5-1.5.8-2.1.3-.6.6-1 .8-1.3.2-.3.2-.5 0-.6-.1-.1-.3 0-.7.4-.4.4-.8 1-1.1 1.8-.3.8-.5 1.6-.5 2.4 0 1.5.4 2.7 1.1 3.6.7.9 1.6 1.4 2.7 1.4.5 0 .9-.2 1.2-.5.3-.3.5-.8.5-1.3 0-1-.2-2.1-.7-3.3l-.6-1.6c-.2-.6-.3-1.1-.3-1.6 0-1.1.4-1.6 1.1-1.6.4 0 .7.2 1.1.5.4.3.7.8 1 1.5.3.7.4 1.4.4 2.2 0 1.4-.3 2.5-1 3.4-.7.9-1.5 1.4-2.6 1.4zm9.15-1.1c-.2.7-.5 1.2-.9 1.5-.4.3-.8.5-1.2.5-.4 0-.8-.2-1.1-.5-.3-.3-.5-.8-.5-1.3 0-.5.1-1 .4-1.5.3-.5.6-.9 1-1.1.4-.2.8-.3 1.1-.3.4 0 .7.1 1 .3.3.2.5.5.6.9.1.4.2.8.2 1.2 0 .4-.1.8-.2 1.1l.1.2z"/>
+    <circle cx="24" cy="24" r="24" fill="currentColor" />
+    <path
+      d="M25.54 34.58c-10.94 0-17.18-7.5-17.44-19.98h5.48c.18 9.16 4.22 13.04 7.42 13.84V14.6h5.16v7.9c3.16-.34 6.48-3.94 7.6-7.9h5.16c-.86 4.88-4.46 8.48-7.02 9.96 2.56 1.2 6.66 4.34 8.22 10.02h-5.68c-1.22-3.8-4.26-6.74-8.28-7.14v7.14z"
+      fill="#0b0807"
+    />
   </svg>
 );
 
@@ -61,19 +62,13 @@ export function Footer({
     <footer className={`border-t border-[var(--border-soft)] bg-[rgba(10,8,6,0.78)] backdrop-blur-2xl ${className}`}>
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          {/* Копирайт */}
           <p className="text-sm text-[var(--text-soft)]">
             {copyrightText}
           </p>
-
-          {/* Социальные сети и email */}
           <div className="flex items-center gap-4">
-            {/* Подписывайтесь на нас */}
             <span className="text-sm text-[var(--text-muted)]">
               Подписывайтесь на нас
             </span>
-
-            {/* Telegram - только иконка без рамки */}
             <a
               href={socialLinks.telegram}
               target="_blank"
@@ -83,8 +78,6 @@ export function Footer({
             >
               <TelegramIcon className="h-6 w-6" />
             </a>
-
-            {/* VK - только иконка без рамки */}
             <a
               href={socialLinks.vk}
               target="_blank"
@@ -95,14 +88,10 @@ export function Footer({
               <VKIcon className="h-6 w-6" />
             </a>
 
-            {/* Разделитель */}
             <div className="mx-1 h-6 w-px bg-[var(--border-soft)]" />
-
-            {/* Email с копированием в буфер */}
             <button
               onClick={handleCopyEmail}
               className="relative flex items-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[rgba(255,246,229,0.03)] px-3 py-2 text-sm font-medium text-[var(--text-muted)] transition hover:border-[rgba(232,161,67,0.22)] hover:bg-[rgba(232,161,67,0.08)] hover:text-[var(--accent-soft)]"
-              aria-label="Copy email to clipboard"
             >
               {copied ? (
                 <>
